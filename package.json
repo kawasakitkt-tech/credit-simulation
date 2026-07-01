@@ -1,0 +1,17 @@
+{
+  "name": "copilot-credit-calculator",
+  "version": "1.0.0",
+  "description": "GitHub Copilot クレジット消費量計算ツール",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "transform": {}
+  }
+}
