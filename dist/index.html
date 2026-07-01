@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Copilot クレジット消費量計算ツール</title>
+<style>
+  :root {
+    --border: #d0d7de;
+    --accent: #0969da;
+    --warning: #cf222e;
+    --bg: #f6f8fa;
+    --card-bg: #ffffff;
+    --text: #1f2328;
+    --muted: #57606a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    max-width: 860px;
+    margin-bottom: 16px;
+  }
+
+  .provisional-note,
+  .overhead-note,
+  .filesize-note {
+    max-width: 860px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+  }
+
+  .provisional-note {
+    border-color: var(--warning);
+    background: #fff8f8;
+    color: var(--warning);
+  }
+
+  .overhead-note,
+  .filesize-note {
+    background: #f6f8fa;
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    max-width: 860px;
+  }
+
+  .card h2 {
+    font-size: 1.1rem;
+    margin-top: 0;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+
+  label {
+    display: block;
+    font-weight: 600;
+    margin-top: 14px;
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+  }
+
+  label:first-of-type {
+    margin-top: 0;
+  }
+
+  select,
+  textarea,
+  input[type="number"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text);
+  }
+
+  select:focus,
+  textarea:focus,
+  input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+  }
+
+  textarea {
+    min-height: 90px;
+    resize: vertical;
+  }
+
+  .help-text {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 4px;
+  }
+
+  #fileList {
+    margin-top: 10px;
+  }
+
+  .file-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .file-item select {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .file-item .file-kb-input {
+    flex: 0 0 100px;
+    width: 100px;
+  }
+
+  .file-item .file-remove {
+    flex: 0 0 auto;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--warning);
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  .file-item .file-remove:hover {
+    background: #fff1f0;
+  }
+
+  button {
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  #btnAddFile {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: var(--accent);
+    font-size: 0.9rem;
+    margin-top: 6px;
+  }
+
+  #btnAddFile:hover {
+    background: #f0f6fc;
+  }
+
+  .btn-calc {
+    display: block;
+    width: 100%;
+    margin-top: 20px;
+    padding: 10px 16px;
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .btn-calc:hover {
+    background: #0860ca;
+  }
+
+  .result-grid {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .result-tile {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    background: #f6f8fa;
+  }
+
+  .result-tile .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .result-tile .label {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 4px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  tbody tr:hover {
+    background: #f6f8fa;
+  }
+
+  .provider-row td {
+    background: #f6f8fa;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+  <h1>GitHub Copilot クレジット消費量計算ツール</h1>
+  <p class="subtitle">
+    2026/6/1 に premium request 課金は廃止され、GitHub AI Credits（1クレジット = $0.01）の従量課金制に移行しました。
+    Chat / CLI / code review の消費量を事前見積もりし、事務局承認プロセスに活用してください。
+  </p>
+
+  <div class="provisional-note">
+    ⚠️ <code>EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE</code> は実測前の暫定値です。<code>src/rates.js</code> の値を確認してください。
+  </div>
+
+  <div class="overhead-note">
+    ℹ️ Chat/CLI では system prompt・tool definitions 等の見えない文脈分として、機能ごとの概算オーバーヘッド（<code>FEATURE_OVERHEAD_TOKENS</code>）を入力トークンに自動加算しています。
+  </div>
+
+  <div class="filesize-note">
+    ℹ️ ファイルサイズ(KB)からのトークン推定は簡易概算です。Word/Excel/PowerPoint/PDF は圧縮・画像・メタデータ等の影響で実際のトークン量と差が出ることがあります。精度を上げたい場合は本文をテキスト欄へ貼り付けてください。
+  </div>
+
+  <div class="card">
+    <label for="featureMode">機能</label>
+    <select id="featureMode">
+      <option value="chat">Copilot Chat</option>
+      <option value="cli">Copilot CLI</option>
+      <option value="codeReview">Copilot code review</option>
+    </select>
+  </div>
+
+  <!-- Chat/CLI 用フォーム -->
+  <div class="card" id="chatCliForm">
+    <h2>入力設定</h2>
+    <label for="modelId">使用モデル</label>
+    <select id="modelId"></select> <!-- provider ごとに <optgroup> でグルーピング -->
+
+    <label for="promptText">プロンプト・指示文</label>
+    <textarea id="promptText"></textarea>
+    <span class="help-text" id="promptTokenHint"></span>
+
+    <label for="contextText">参照コード・設計書（テキスト）</label>
+    <textarea id="contextText"></textarea>
+    <span class="help-text" id="contextTokenHint"></span>
+
+    <label>添付ファイル</label>
+    <div id="fileList"></div>
+    <button type="button" id="btnAddFile">＋ ファイルを追加</button>
+
+    <label for="historyTurns">今回のリクエストに含める過去会話ターン数</label>
+    <input type="number" id="historyTurns" value="0" min="0" max="100">
+    <span class="help-text">参照する過去会話ターン数。多いほど履歴分のトークンが今回のリクエストに加算されます。</span>
+
+    <label for="outputChars">想定回答文字数</label>
+    <input type="number" id="outputChars" value="1500" min="1">
+
+    <label for="cachedInputPct">キャッシュ入力割合 (%)</label>
+    <input type="number" id="cachedInputPct" value="0" min="0" max="100">
+
+    <button type="button" class="btn-calc" id="btnCalcChat">クレジット消費量を計算する</button>
+  </div>
+
+  <!-- code review 用フォーム -->
+  <div class="card" id="codeReviewForm" style="display:none">
+    <h2>Copilot code review</h2>
+    <p class="help-text">モデルは GitHub 側で自動選択されるため選択欄はありません。</p>
+    <label for="diffLines">変更行数（diff行数）</label>
+    <input type="number" id="diffLines" value="200" min="1">
+    <button type="button" class="btn-calc" id="btnCalcCodeReview">クレジット消費量を計算する</button>
+  </div>
+
+  <!-- 結果エリア -->
+  <div id="results" style="display:none">
+    <div class="card">
+      <h2>計算結果</h2>
+      <div class="result-grid">
+        <div class="result-tile"><div class="value" id="resCredits">-</div><div class="label">消費クレジット</div></div>
+        <div class="result-tile"><div class="value" id="resUSD">-</div><div class="label">概算金額 (USD)</div></div>
+      </div>
+      <table><thead><tr><th>内訳</th><th>クレジット</th></tr></thead><tbody id="breakdownBody"></tbody></table>
+    </div>
+
+    <div class="card" id="comparisonCard">
+      <h2>モデル別比較（登録済みモデルすべて、provider ごとにグルーピング表示）</h2>
+      <table><thead><tr><th>モデル</th><th>提供元</th><th>クレジット</th><th>USD</th></tr></thead><tbody id="comparisonBody"></tbody></table>
+    </div>
+  </div>
+
+  <script>
+// クレジット単価 (USD per 1,000,000 tokens)
+// GitHub Copilot は 2026/6/1 に premium request 課金を廃止し、
+// トークンベースの従量課金（GitHub AI Credits, 1 credit = $0.01）へ移行した。
+// 計算式: credits = tokens × usd_per_1m / 10,000 （$0.01/credit 換算込み）
+// 出典: 事務局提供の単価表（2026-07-01 時点）
+const USD_PER_CREDIT = 0.01;
+
+// Chat/CLI利用時、ユーザー入力とは別に system prompt / tool definitions /
+// custom instructions 等の見えない文脈が消費するトークンの概算固定値。
+// TODO: 実測データが無いため暫定値。Phase 1 で実測較正すること。
+const FEATURE_OVERHEAD_TOKENS = {
+  chat: 1500,
+  cli: 2500,
+};
+
+// Copilot code review はモデルをユーザーが選択できないため、
+// PR 変更行数（diff行数）に経験係数を掛けた概算とする。
+// 変数名に EXPERIMENTAL を含め、他のモデル別単価と同列の確からしさに見えないようにする。
+// 要確認: 実測データが無いため暫定値。Phase 1 で実測較正すること。
+const EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE = 0.05; // 要確認（暫定値）
+
+const CLAUDE_SONNET_4_RATE = { input: 3.00, cachedInput: 0.30, cacheWrite: 3.75, output: 15.00 };
+const CLAUDE_OPUS_4_RATE   = { input: 5.00, cachedInput: 0.50, cacheWrite: 6.25, output: 25.00 };
+
+// 登録モデル数は今後増減しうる。テスト・UI ロジックは
+// Object.keys(MODEL_RATES).length を単一の真実源として扱い、固定数を仮定しない。
+const MODEL_RATES = {
+  'gpt-5-mini': {
+    label: 'GPT-5 mini', provider: 'OpenAI',
+    input: 0.25, cachedInput: 0.025, cacheWrite: null, output: 2.00,
+  },
+  'gpt-5-3-codex': {
+    label: 'GPT-5.3-Codex', provider: 'OpenAI',
+    input: 1.75, cachedInput: 0.175, cacheWrite: null, output: 14.00,
+  },
+  'gpt-5-4': {
+    label: 'GPT-5.4', provider: 'OpenAI',
+    input: 2.50, cachedInput: 0.25, cacheWrite: null, output: 15.00,
+    longContext: { thresholdTokens: 272000, input: 5.00, cachedInput: 0.50, cacheWrite: null, output: 22.50 },
+  },
+  'gpt-5-4-mini': {
+    label: 'GPT-5.4 mini', provider: 'OpenAI',
+    input: 0.75, cachedInput: 0.075, cacheWrite: null, output: 4.50,
+  },
+  'gpt-5-4-nano': {
+    label: 'GPT-5.4 nano', provider: 'OpenAI',
+    input: 0.20, cachedInput: 0.02, cacheWrite: null, output: 1.25,
+  },
+  'gpt-5-5': {
+    label: 'GPT-5.5', provider: 'OpenAI',
+    input: 5.00, cachedInput: 0.50, cacheWrite: null, output: 30.00,
+    longContext: { thresholdTokens: 272000, input: 10.00, cachedInput: 1.00, cacheWrite: null, output: 45.00 },
+  },
+  'claude-haiku-4-5': {
+    label: 'Claude Haiku 4.5', provider: 'Anthropic',
+    input: 1.00, cachedInput: 0.10, cacheWrite: 1.25, output: 5.00,
+  },
+  'claude-sonnet-4': { label: 'Claude Sonnet 4', provider: 'Anthropic', ...CLAUDE_SONNET_4_RATE },
+  'claude-sonnet-4-5': { label: 'Claude Sonnet 4.5', provider: 'Anthropic', ...CLAUDE_SONNET_4_RATE },
+  'claude-sonnet-4-6': { label: 'Claude Sonnet 4.6', provider: 'Anthropic', ...CLAUDE_SONNET_4_RATE },
+  'claude-opus-4-5': { label: 'Claude Opus 4.5', provider: 'Anthropic', ...CLAUDE_OPUS_4_RATE },
+  'claude-opus-4-6': { label: 'Claude Opus 4.6', provider: 'Anthropic', ...CLAUDE_OPUS_4_RATE },
+  'claude-opus-4-7': { label: 'Claude Opus 4.7', provider: 'Anthropic', ...CLAUDE_OPUS_4_RATE },
+  'claude-opus-4-8': { label: 'Claude Opus 4.8', provider: 'Anthropic', ...CLAUDE_OPUS_4_RATE },
+  'claude-sonnet-5': {
+    label: 'Claude Sonnet 5', provider: 'Anthropic',
+    input: 2.00, cachedInput: 0.20, cacheWrite: 2.50, output: 10.00,
+    // 要確認: プロモ価格。2026-08-31 まで。期限後に正規単価へ更新すること。
+    promoExpiresAt: '2026-08-31',
+  },
+  'claude-opus-4-8-fast': {
+    label: 'Claude Opus 4.8 fast mode (Preview)', provider: 'Anthropic',
+    input: 10.00, cachedInput: 1.00, cacheWrite: 12.50, output: 50.00,
+  },
+  'gemini-2-5-pro': {
+    label: 'Gemini 2.5 Pro', provider: 'Google',
+    input: 1.25, cachedInput: 0.125, cacheWrite: null, output: 10.00,
+  },
+  'gemini-3-flash': {
+    label: 'Gemini 3 Flash', provider: 'Google',
+    input: 0.50, cachedInput: 0.05, cacheWrite: null, output: 3.00,
+  },
+  'gemini-3-1-pro': {
+    label: 'Gemini 3.1 Pro', provider: 'Google',
+    input: 2.00, cachedInput: 0.20, cacheWrite: null, output: 12.00,
+    longContext: { thresholdTokens: 200000, input: 4.00, cachedInput: 0.40, cacheWrite: null, output: 18.00 },
+  },
+  'gemini-3-5-flash': {
+    label: 'Gemini 3.5 Flash', provider: 'Google',
+    input: 1.50, cachedInput: 0.15, cacheWrite: null, output: 9.00,
+  },
+  'raptor-mini': {
+    label: 'Raptor mini', provider: 'GitHub',
+    input: 0.25, cachedInput: 0.025, cacheWrite: null, output: 2.00,
+  },
+  'mai-code-1-flash': {
+    label: 'MAI-Code-1-Flash', provider: 'Microsoft',
+    input: 0.75, cachedInput: 0.075, cacheWrite: null, output: 4.50,
+  },
+};
+
+
+// トークン推定係数（実測値に近い近似）
+// 日本語: 1文字 ≈ 0.65 トークン（ひらがな/カタカナ/漢字はUTF-8で2-3バイト = 1-2トークン）
+// 英語:   1文字 ≈ 0.25 トークン（4文字 = 1トークン）
+
+const RATIO = {
+  ja: 0.65,
+  en: 0.25,
+};
+
+// 文字列中の日本語文字比率を計算して適切なレートを選択
+function detectRatio(text) {
+  if (!text) return RATIO.en;
+  const jaPattern = /[　-鿿豈-﫿]/g;
+  const jaCount = (text.match(jaPattern) || []).length;
+  const jaRatio = jaCount / text.length;
+  // 20%超が日本語ならJA係数
+  if (jaRatio > 0.2) return RATIO.ja;
+  return RATIO.en;
+}
+
+function estimateTextTokens(text) {
+  if (!text || text.length === 0) return 0;
+  const ratio = detectRatio(text);
+  return Math.ceil(text.length * ratio);
+}
+
+// ファイル種別ごとのトークン換算係数（ファイルサイズ KB あたり）。あくまで参考値。
+// CLAUDE.md 記載の日本語係数と一致させる: md=650, pdf=400, docx=300, pptx=250, xlsx=200
+// Word/Excel/PPT は XML ラッパーのオーバーヘッドがあるため実コンテンツより少ない
+const FILE_TOKENS_PER_KB = {
+  md:   { ja: 650, en: 250 },
+  pdf:  { ja: 400, en: 180 },
+  docx: { ja: 300, en: 130 },
+  pptx: { ja: 250, en: 110 },
+  xlsx: { ja: 200, en: 100 },
+};
+
+function estimateFileTokens(fileSizeKB, fileType, encoding = 'ja') {
+  const rates = FILE_TOKENS_PER_KB[fileType] ?? FILE_TOKENS_PER_KB.md;
+  const rate = rates[encoding] ?? rates.ja;
+  return Math.ceil(fileSizeKB * rate);
+}
+
+// 今回の1リクエストに含める過去会話ターンの履歴トークンを推定する。
+// 「複数ターンの累積利用量」ではなく、今回送信するコンテキストに乗る履歴量のみを扱う。
+function estimateHistoryTokens(previousTurns, avgUserChars, avgAssistantChars) {
+  if (previousTurns <= 0) return 0;
+
+  const userTokens = estimateTextTokens('a'.repeat(avgUserChars));
+  const assistantTokens = estimateTextTokens('a'.repeat(avgAssistantChars));
+
+  return Math.ceil(previousTurns * (userTokens + assistantTokens));
+}
+
+
+import {
+  MODEL_RATES,
+  EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE,
+  USD_PER_CREDIT,
+  FEATURE_OVERHEAD_TOKENS,
+} from './rates.js';
+
+function pickRateTable(modelRates, contextTokens) {
+  if (modelRates.longContext && contextTokens > modelRates.longContext.thresholdTokens) {
+    return modelRates.longContext;
+  }
+  return modelRates;
+}
+
+function toCredits(tokens, usdPer1M) {
+  if (usdPer1M == null) return 0;
+  return (tokens * usdPer1M) / 10000;
+}
+
+function calculateCredits(tokens, modelKey) {
+  const {
+    inputTokens = 0,
+    cachedInputTokens = 0,
+    cacheWriteTokens = 0,
+    outputTokens = 0,
+  } = tokens;
+
+  const modelRates = MODEL_RATES[modelKey];
+  if (!modelRates) throw new Error(`Unknown model: ${modelKey}`);
+
+  // ロングコンテキスト判定は inputTokens 単体ではなく contextTokens（必須修正4）で行う
+  const contextTokens = inputTokens + cachedInputTokens + cacheWriteTokens;
+  const rate = pickRateTable(modelRates, contextTokens);
+
+  const inputCredits       = toCredits(inputTokens, rate.input);
+  const cachedInputCredits = toCredits(cachedInputTokens, rate.cachedInput);
+  const cacheWriteCredits  = toCredits(cacheWriteTokens, rate.cacheWrite);
+  const outputCredits      = toCredits(outputTokens, rate.output);
+  const totalCredits = inputCredits + cachedInputCredits + cacheWriteCredits + outputCredits;
+
+  return {
+    modelKey,
+    label: modelRates.label,
+    usedLongContextRate: rate !== modelRates,
+    breakdown: {
+      inputCredits: round4(inputCredits),
+      cachedInputCredits: round4(cachedInputCredits),
+      cacheWriteCredits: round4(cacheWriteCredits),
+      outputCredits: round4(outputCredits),
+    },
+    totalCredits: round4(totalCredits),
+    totalUSD: round4(creditsToUSD(totalCredits)),
+  };
+}
+
+// 登録済みモデルすべてを動的に比較する。モデル数は Object.keys(MODEL_RATES) に追従するため、
+// モデルの追加・削除があってもこの関数・呼び出し側のテストは変更不要。
+function compareModels(tokens) {
+  return Object.keys(MODEL_RATES)
+    .map((modelKey) => calculateCredits(tokens, modelKey))
+    .sort((a, b) => a.totalCredits - b.totalCredits);
+}
+
+function calculateCodeReviewCredits(diffLines) {
+  const totalCredits = diffLines * EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE;
+  return {
+    diffLines,
+    totalCredits: round4(totalCredits),
+    totalUSD: round4(creditsToUSD(totalCredits)),
+  };
+}
+
+function creditsToUSD(credits) {
+  return credits * USD_PER_CREDIT;
+}
+
+// Chat/CLI 用の tokens オブジェクトを組み立てる。
+// system prompt / tool definitions / custom instructions 等の見えないオーバーヘッドを
+// FEATURE_OVERHEAD_TOKENS で加算し、cacheHitRatio に応じて reference tokens を
+// cachedInputTokens と freshReferenceTokens に振り分ける。
+function buildChatCliTokens({
+  promptTokens = 0,
+  referenceTokens = 0,
+  historyTokens = 0,
+  outputTokens = 0,
+  cacheHitRatio = 0,
+  feature = 'chat',
+}) {
+  const normalizedCacheHitRatio = Math.min(Math.max(cacheHitRatio, 0), 1);
+  const overheadTokens = FEATURE_OVERHEAD_TOKENS[feature] ?? 0;
+
+  const cachedInputTokens = Math.ceil(referenceTokens * normalizedCacheHitRatio);
+  const freshReferenceTokens = Math.ceil(referenceTokens * (1 - normalizedCacheHitRatio));
+
+  return {
+    inputTokens: Math.ceil(promptTokens + freshReferenceTokens + historyTokens + overheadTokens),
+    cachedInputTokens,
+    cacheWriteTokens: 0,
+    outputTokens: Math.ceil(outputTokens),
+  };
+}
+
+function round4(n) {
+  return Math.round(n * 10000) / 10000;
+}
+
+
+
+
+import {
+  buildChatCliTokens,
+  calculateCredits,
+  compareModels,
+  calculateCodeReviewCredits,
+  creditsToUSD,
+} from './calculator.js';
+
+const FILE_TYPE_OPTIONS = [
+  { value: 'md', label: 'Markdown / テキスト' },
+  { value: 'pdf', label: 'PDF' },
+  { value: 'docx', label: 'Word (.docx)' },
+  { value: 'pptx', label: 'PowerPoint (.pptx)' },
+  { value: 'xlsx', label: 'Excel (.xlsx)' },
+];
+
+const BREAKDOWN_LABELS = {
+  inputCredits: '入力',
+  cachedInputCredits: 'キャッシュ入力',
+  cacheWriteCredits: 'キャッシュ書き込み',
+  outputCredits: '出力',
+};
+
+function formatCredits(credits) {
+  return credits.toLocaleString('ja-JP', { maximumFractionDigits: 4 });
+}
+
+function formatUSD(usd) {
+  return `${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+}
+
+// モデルセレクトを provider ごとに <optgroup> でグルーピングして生成
+// （Object.entries(MODEL_RATES) 由来。モデル数・provider 数は固定しない）
+function populateModelSelect() {
+  const select = document.getElementById('modelId');
+  select.innerHTML = '';
+
+  const groups = new Map(); // provider -> optgroup element (insertion order preserved)
+
+  Object.entries(MODEL_RATES).forEach(([modelKey, rate]) => {
+    const provider = rate.provider ?? 'Other';
+    let group = groups.get(provider);
+    if (!group) {
+      group = document.createElement('optgroup');
+      group.label = provider;
+      groups.set(provider, group);
+      select.appendChild(group);
+    }
+    const option = document.createElement('option');
+    option.value = modelKey;
+    option.textContent = rate.label ?? modelKey;
+    group.appendChild(option);
+  });
+}
+
+// featureMode の切り替えで chatCliForm / codeReviewForm の表示を切り替え、
+// codeReview 選択時は comparisonCard を非表示にする。
+// フォームを切り替えたら #results も一旦隠し、再計算を促す。
+function bindFeatureModeToggle() {
+  const featureModeSelect = document.getElementById('featureMode');
+  const chatCliForm = document.getElementById('chatCliForm');
+  const codeReviewForm = document.getElementById('codeReviewForm');
+  const results = document.getElementById('results');
+  const comparisonCard = document.getElementById('comparisonCard');
+
+  const applyMode = () => {
+    const mode = featureModeSelect.value;
+    const isCodeReview = mode === 'codeReview';
+    chatCliForm.style.display = isCodeReview ? 'none' : '';
+    codeReviewForm.style.display = isCodeReview ? '' : 'none';
+    comparisonCard.style.display = isCodeReview ? 'none' : '';
+    results.style.display = 'none';
+  };
+
+  featureModeSelect.addEventListener('change', applyMode);
+  applyMode();
+}
+
+// 添付ファイル行を1件 #fileList に追加する。
+// 行には「ファイル種別セレクト」「サイズ(KB)入力」「削除ボタン」を持たせる。
+function addFileRow() {
+  const fileList = document.getElementById('fileList');
+
+  const row = document.createElement('div');
+  row.className = 'file-item';
+
+  const typeSelect = document.createElement('select');
+  typeSelect.className = 'file-type';
+  FILE_TYPE_OPTIONS.forEach(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    typeSelect.appendChild(option);
+  });
+
+  const kbInput = document.createElement('input');
+  kbInput.type = 'number';
+  kbInput.className = 'file-kb-input';
+  kbInput.min = '0';
+  kbInput.value = '100';
+  kbInput.placeholder = 'KB';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'file-remove';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', () => {
+    row.remove();
+  });
+
+  row.appendChild(typeSelect);
+  row.appendChild(kbInput);
+  row.appendChild(removeBtn);
+  fileList.appendChild(row);
+}
+
+// プロンプト・参照テキスト・添付ファイル・過去会話ターン数からトークンを集計し、
+// buildChatCliTokens に渡して tokens オブジェクトを組み立てる
+function collectChatCliTokens(feature) {
+  const promptTokens = estimateTextTokens(document.getElementById('promptText').value);
+  const contextTokens = estimateTextTokens(document.getElementById('contextText').value);
+
+  let fileTokens = 0;
+  document.querySelectorAll('.file-item').forEach((row) => {
+    const fileType = row.querySelector('.file-type').value;
+    const fileSizeKB = parseFloat(row.querySelector('.file-kb-input').value) || 0;
+    fileTokens += estimateFileTokens(fileSizeKB, fileType, 'ja');
+  });
+
+  const historyTurns = parseInt(document.getElementById('historyTurns').value, 10) || 0;
+  const historyTokens = estimateHistoryTokens(historyTurns, /* avgUserChars */ 500, /* avgAssistantChars */ 1000);
+
+  const outputChars = parseInt(document.getElementById('outputChars').value, 10) || 0;
+  const outputTokens = estimateTextTokens('a'.repeat(outputChars));
+
+  const cacheHitRatio = (parseFloat(document.getElementById('cachedInputPct').value) || 0) / 100;
+
+  return buildChatCliTokens({
+    promptTokens,
+    referenceTokens: contextTokens + fileTokens,
+    historyTokens,
+    outputTokens,
+    cacheHitRatio,
+    feature,
+  });
+}
+
+function bindCalcChatButton() {
+  document.getElementById('btnCalcChat').addEventListener('click', () => {
+    const feature = document.getElementById('featureMode').value; // 'chat' | 'cli'
+    const tokens = collectChatCliTokens(feature);
+    const modelId = document.getElementById('modelId').value;
+    const result = calculateCredits(tokens, modelId);
+    const comparisons = compareModels(tokens);
+    renderChatResult(result, comparisons);
+  });
+}
+
+function bindCalcCodeReviewButton() {
+  document.getElementById('btnCalcCodeReview').addEventListener('click', () => {
+    const diffLines = parseInt(document.getElementById('diffLines').value, 10) || 0;
+    const result = calculateCodeReviewCredits(diffLines);
+    renderCodeReviewResult(result);
+  });
+}
+
+// トークン数ヒントをライブ更新する（input イベント）
+function bindTokenHints() {
+  const promptText = document.getElementById('promptText');
+  const promptTokenHint = document.getElementById('promptTokenHint');
+  const contextText = document.getElementById('contextText');
+  const contextTokenHint = document.getElementById('contextTokenHint');
+
+  const updatePromptHint = () => {
+    promptTokenHint.textContent = `推定 ${estimateTextTokens(promptText.value).toLocaleString('ja-JP')} トークン`;
+  };
+  const updateContextHint = () => {
+    contextTokenHint.textContent = `推定 ${estimateTextTokens(contextText.value).toLocaleString('ja-JP')} トークン`;
+  };
+
+  promptText.addEventListener('input', updatePromptHint);
+  contextText.addEventListener('input', updateContextHint);
+
+  updatePromptHint();
+  updateContextHint();
+}
+
+function bindFileRowHandlers() {
+  document.getElementById('btnAddFile').addEventListener('click', () => {
+    addFileRow();
+  });
+}
+
+// #resCredits, #resUSD, #breakdownBody, #comparisonBody (chat/CLIのみ) を更新し #results を表示する
+function renderChatResult(result, comparisons) {
+  const resultsEl = document.getElementById('results');
+  const comparisonCard = document.getElementById('comparisonCard');
+
+  document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
+  document.getElementById('resUSD').textContent = formatUSD(result.totalUSD);
+
+  const breakdownBody = document.getElementById('breakdownBody');
+  breakdownBody.innerHTML = '';
+  Object.entries(result.breakdown)
+    .filter(([, credits]) => credits > 0)
+    .forEach(([key, credits]) => {
+      const tr = document.createElement('tr');
+      const labelTd = document.createElement('td');
+      labelTd.textContent = BREAKDOWN_LABELS[key] ?? key;
+      const creditsTd = document.createElement('td');
+      creditsTd.textContent = formatCredits(credits);
+      tr.appendChild(labelTd);
+      tr.appendChild(creditsTd);
+      breakdownBody.appendChild(tr);
+    });
+
+  const comparisonBody = document.getElementById('comparisonBody');
+  comparisonBody.innerHTML = '';
+  comparisons.forEach((comparison) => {
+    const modelRate = MODEL_RATES[comparison.modelKey] ?? {};
+    const tr = document.createElement('tr');
+    if (comparison.modelKey === result.modelKey) {
+      tr.style.fontWeight = '600';
+    }
+    const modelTd = document.createElement('td');
+    modelTd.textContent = comparison.label;
+    const providerTd = document.createElement('td');
+    providerTd.textContent = modelRate.provider ?? '-';
+    const creditsTd = document.createElement('td');
+    creditsTd.textContent = formatCredits(comparison.totalCredits);
+    const usdTd = document.createElement('td');
+    usdTd.textContent = formatUSD(comparison.totalUSD);
+    tr.appendChild(modelTd);
+    tr.appendChild(providerTd);
+    tr.appendChild(creditsTd);
+    tr.appendChild(usdTd);
+    comparisonBody.appendChild(tr);
+  });
+
+  comparisonCard.style.display = '';
+  resultsEl.style.display = '';
+}
+
+function renderCodeReviewResult(result) {
+  const resultsEl = document.getElementById('results');
+  const comparisonCard = document.getElementById('comparisonCard');
+
+  document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
+  document.getElementById('resUSD').textContent = formatUSD(result.totalUSD);
+
+  const breakdownBody = document.getElementById('breakdownBody');
+  breakdownBody.innerHTML = '';
+  const tr = document.createElement('tr');
+  const labelTd = document.createElement('td');
+  labelTd.textContent = `code review（${result.diffLines} 行の暫定係数）`;
+  const creditsTd = document.createElement('td');
+  creditsTd.textContent = formatCredits(result.totalCredits);
+  tr.appendChild(labelTd);
+  tr.appendChild(creditsTd);
+  breakdownBody.appendChild(tr);
+
+  comparisonCard.style.display = 'none';
+  resultsEl.style.display = '';
+}
+
+populateModelSelect();
+bindFeatureModeToggle();
+bindCalcChatButton();
+bindCalcCodeReviewButton();
+bindTokenHints();
+bindFileRowHandlers();
+
+</script>
+</body>
+</html>
