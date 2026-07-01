@@ -13,6 +13,9 @@ let html = readFileSync('index.html', 'utf8');
 const strip = (s) => s
   .replace(/^export\s+(function|const|class)/gm, '$1')
   .replace(/^export\s+\{[^}]+\};\s*$/gm, '')
+  // Handle both single-line and multi-line brace-style imports
+  .replace(/^import\s+\{[\s\S]*?\}\s+from\s+['"][^'"]+['"];\s*$/gm, '')
+  // Fallback for any remaining single-line imports (defensive)
   .replace(/^import\s+.*?from\s+['"][^'"]+['"];\s*$/gm, '');
 
 const combined = [rates, tokenizer, calculator, ui].map(strip).join('\n\n');
@@ -41,6 +44,13 @@ for (const snippet of requiredSnippets) {
   if (!html.includes(snippet)) {
     throw new Error(`Build failed: missing ${snippet}`);
   }
+}
+
+// Validate that no leftover import/export statements remain in the inlined script
+const leftoverImportExportRegex = /^\s*(import|export)\s/m;
+const scriptMatch = html.match(/<script>\n([\s\S]*?)<\/script>/);
+if (scriptMatch && leftoverImportExportRegex.test(scriptMatch[1])) {
+  throw new Error('Build failed: leftover import/export statements found in inlined script');
 }
 
 console.log('Built dist/index.html');

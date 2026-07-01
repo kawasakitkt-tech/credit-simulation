@@ -493,12 +493,6 @@ function estimateHistoryTokens(previousTurns, avgUserChars, avgAssistantChars) {
 }
 
 
-import {
-  MODEL_RATES,
-  EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE,
-  USD_PER_CREDIT,
-  FEATURE_OVERHEAD_TOKENS,
-} from './rates.js';
 
 function pickRateTable(modelRates, contextTokens) {
   if (modelRates.longContext && contextTokens > modelRates.longContext.thresholdTokens) {
@@ -602,13 +596,6 @@ function round4(n) {
 
 
 
-import {
-  buildChatCliTokens,
-  calculateCredits,
-  compareModels,
-  calculateCodeReviewCredits,
-  creditsToUSD,
-} from './calculator.js';
 
 const FILE_TYPE_OPTIONS = [
   { value: 'md', label: 'Markdown / テキスト' },
