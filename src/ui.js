@@ -6,6 +6,7 @@ import {
   compareModels,
   calculateCodeReviewCredits,
   creditsToUSD,
+  estimateCacheHitRatio,
 } from './calculator.js';
 
 const FILE_TYPE_OPTIONS = [
@@ -21,6 +22,14 @@ const BREAKDOWN_LABELS = {
   cachedInputCredits: 'キャッシュ入力',
   cacheWriteCredits: 'キャッシュ書き込み',
   outputCredits: '出力',
+};
+
+const CACHE_SCENARIO_LABELS = {
+  initial: '初回依頼',
+  noReference: '参照情報なし',
+  secondUse: '同じ資料を使う2回目',
+  twoToThreeTurns: '同じ資料で2〜3往復',
+  fourPlusTurns: '同じ資料で4往復以上',
 };
 
 function formatCredits(credits) {
@@ -64,6 +73,7 @@ function bindFeatureModeToggle() {
   const codeReviewForm = document.getElementById('codeReviewForm');
   const results = document.getElementById('results');
   const comparisonCard = document.getElementById('comparisonCard');
+  const cliCacheBonusRow = document.getElementById('cliCacheBonusRow');
 
   const applyMode = () => {
     const mode = featureModeSelect.value;
@@ -71,6 +81,7 @@ function bindFeatureModeToggle() {
     chatCliForm.style.display = isCodeReview ? 'none' : '';
     codeReviewForm.style.display = isCodeReview ? '' : 'none';
     comparisonCard.style.display = isCodeReview ? 'none' : '';
+    cliCacheBonusRow.style.display = mode === 'cli' ? '' : 'none';
     results.style.display = 'none';
   };
 
@@ -117,7 +128,9 @@ function addFileRow() {
 }
 
 // プロンプト・参照テキスト・添付ファイル・過去会話ターン数からトークンを集計し、
-// buildChatCliTokens に渡して tokens オブジェクトを組み立てる
+// cacheScenario/cliSameSession から estimateCacheHitRatio でキャッシュ率を自動算出したうえで
+// buildChatCliTokens に渡して tokens オブジェクトを組み立てる。
+// 戻り値には結果表示用のキャッシュ内訳情報 (cacheInfo) も含む。
 function collectChatCliTokens(feature) {
   const promptTokens = estimateTextTokens(document.getElementById('promptText').value);
   const contextTokens = estimateTextTokens(document.getElementById('contextText').value);
@@ -135,26 +148,44 @@ function collectChatCliTokens(feature) {
   const outputChars = parseInt(document.getElementById('outputChars').value, 10) || 0;
   const outputTokens = estimateTextTokens('a'.repeat(outputChars));
 
-  const cacheHitRatio = (parseFloat(document.getElementById('cachedInputPct').value) || 0) / 100;
+  const referenceTokens = contextTokens + fileTokens;
+  const cacheScenario = document.getElementById('cacheScenario').value;
+  const cliSameSession = document.getElementById('cliSameSession').checked;
 
-  return buildChatCliTokens({
+  const cacheHitRatio = estimateCacheHitRatio({
+    cacheScenario,
+    feature,
+    referenceTokens,
+    cliSameSession,
+  });
+
+  const tokens = buildChatCliTokens({
     promptTokens,
-    referenceTokens: contextTokens + fileTokens,
+    referenceTokens,
     historyTokens,
     outputTokens,
     cacheHitRatio,
     feature,
   });
+
+  const cacheInfo = {
+    cacheScenarioLabel: CACHE_SCENARIO_LABELS[cacheScenario] ?? cacheScenario,
+    cacheHitRatio,
+    cachedInputTokens: tokens.cachedInputTokens,
+    freshReferenceTokens: Math.ceil(referenceTokens * (1 - cacheHitRatio)),
+  };
+
+  return { tokens, cacheInfo };
 }
 
 function bindCalcChatButton() {
   document.getElementById('btnCalcChat').addEventListener('click', () => {
     const feature = document.getElementById('featureMode').value; // 'chat' | 'cli'
-    const tokens = collectChatCliTokens(feature);
+    const { tokens, cacheInfo } = collectChatCliTokens(feature);
     const modelId = document.getElementById('modelId').value;
     const result = calculateCredits(tokens, modelId);
     const comparisons = compareModels(tokens);
-    renderChatResult(result, comparisons);
+    renderChatResult(result, comparisons, cacheInfo);
   });
 }
 
@@ -194,12 +225,19 @@ function bindFileRowHandlers() {
 }
 
 // #resCredits, #resUSD, #breakdownBody, #comparisonBody (chat/CLIのみ) を更新し #results を表示する
-function renderChatResult(result, comparisons) {
+function renderChatResult(result, comparisons, cacheInfo) {
   const resultsEl = document.getElementById('results');
   const comparisonCard = document.getElementById('comparisonCard');
 
   document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
   document.getElementById('resUSD').textContent = formatUSD(result.totalUSD);
+
+  const cacheInfoText = document.getElementById('cacheInfoText');
+  cacheInfoText.textContent =
+    `参照情報の再利用状況: ${cacheInfo.cacheScenarioLabel} / ` +
+    `適用キャッシュ率: ${Math.round(cacheInfo.cacheHitRatio * 100)}% / ` +
+    `通常Input扱い: ${cacheInfo.freshReferenceTokens.toLocaleString('ja-JP')} tokens / ` +
+    `Cached Input扱い: ${cacheInfo.cachedInputTokens.toLocaleString('ja-JP')} tokens`;
 
   const breakdownBody = document.getElementById('breakdownBody');
   breakdownBody.innerHTML = '';
@@ -249,6 +287,7 @@ function renderCodeReviewResult(result) {
 
   document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
   document.getElementById('resUSD').textContent = formatUSD(result.totalUSD);
+  document.getElementById('cacheInfoText').textContent = '';
 
   const breakdownBody = document.getElementById('breakdownBody');
   breakdownBody.innerHTML = '';
