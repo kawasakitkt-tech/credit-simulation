@@ -37,6 +37,7 @@ const requiredSnippets = [
   'estimateHistoryTokens',
   'calculateCredits',
   'buildChatCliTokens',
+  'estimateCacheHitRatio',
   'populateModelSelect',
 ];
 
@@ -44,6 +45,15 @@ for (const snippet of requiredSnippets) {
   if (!html.includes(snippet)) {
     throw new Error(`Build failed: missing ${snippet}`);
   }
+}
+
+// キャッシュ率の自由入力欄・開発者向け警告が誤って復活していないことを検証する
+if (html.includes('cachedInputPct')) {
+  throw new Error('Build failed: cachedInputPct should not remain in the final UI');
+}
+
+if (html.includes('src/rates.js の値を確認してください')) {
+  throw new Error('Build failed: developer-facing code review warning should not appear in UI');
 }
 
 // Validate that no leftover import/export statements remain in the inlined script
