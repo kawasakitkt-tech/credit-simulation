@@ -100,6 +100,33 @@ export function buildChatCliTokens({
   };
 }
 
+const CACHE_SCENARIO_BASE_RATIOS = {
+  initial: 0,
+  noReference: 0,
+  secondUse: 0.25,
+  twoToThreeTurns: 0.35,
+  fourPlusTurns: 0.50,
+};
+
+const CLI_SAME_SESSION_BONUS = 0.10;
+const MAX_CACHE_HIT_RATIO = 0.60;
+
+// 参照情報の再利用状況（cacheScenario）から Cached Input 比率を推定する。
+// 利用者が%を直接入力するUIは持たず、この推定値のみを使う。
+export function estimateCacheHitRatio({
+  cacheScenario = 'initial',
+  feature = 'chat',
+  referenceTokens = 0,
+  cliSameSession = false,
+} = {}) {
+  if (referenceTokens <= 0) return 0;
+
+  const baseRatio = CACHE_SCENARIO_BASE_RATIOS[cacheScenario] ?? 0;
+  const cliBonus = feature === 'cli' && cliSameSession ? CLI_SAME_SESSION_BONUS : 0;
+
+  return Math.min(baseRatio + cliBonus, MAX_CACHE_HIT_RATIO);
+}
+
 function round4(n) {
   return Math.round(n * 10000) / 10000;
 }

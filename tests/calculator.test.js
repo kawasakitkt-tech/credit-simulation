@@ -6,6 +6,7 @@ import {
   calculateCodeReviewCredits,
   creditsToUSD,
   buildChatCliTokens,
+  estimateCacheHitRatio,
 } from '../src/calculator.js';
 
 describe('rates.js', () => {
@@ -129,5 +130,74 @@ describe('buildChatCliTokens', () => {
     });
     expect(tokens.cachedInputTokens).toBe(500);
     expect(tokens.inputTokens).toBe(500 + 1500); // freshReference(500) + overhead(1500)
+  });
+});
+
+describe('estimateCacheHitRatio', () => {
+  it('初回依頼は0%', () => {
+    expect(estimateCacheHitRatio({
+      cacheScenario: 'initial',
+      feature: 'chat',
+      referenceTokens: 10000,
+    })).toBe(0);
+  });
+
+  it('参照情報なしは0%', () => {
+    expect(estimateCacheHitRatio({
+      cacheScenario: 'fourPlusTurns',
+      feature: 'chat',
+      referenceTokens: 0,
+    })).toBe(0);
+  });
+
+  it('同じ資料を使う2回目は25%', () => {
+    expect(estimateCacheHitRatio({
+      cacheScenario: 'secondUse',
+      feature: 'chat',
+      referenceTokens: 10000,
+    })).toBe(0.25);
+  });
+
+  it('同じ資料で2〜3往復は35%', () => {
+    expect(estimateCacheHitRatio({
+      cacheScenario: 'twoToThreeTurns',
+      feature: 'chat',
+      referenceTokens: 10000,
+    })).toBe(0.35);
+  });
+
+  it('同じ資料で4往復以上は50%', () => {
+    expect(estimateCacheHitRatio({
+      cacheScenario: 'fourPlusTurns',
+      feature: 'chat',
+      referenceTokens: 10000,
+    })).toBe(0.50);
+  });
+
+  it('CLIで同一セッション継続の場合は+10%', () => {
+    expect(estimateCacheHitRatio({
+      cacheScenario: 'secondUse',
+      feature: 'cli',
+      referenceTokens: 10000,
+      cliSameSession: true,
+    })).toBe(0.35);
+  });
+
+  it('CLI補正込みでも上限は60%', () => {
+    expect(estimateCacheHitRatio({
+      cacheScenario: 'fourPlusTurns',
+      feature: 'cli',
+      referenceTokens: 10000,
+      cliSameSession: true,
+    })).toBe(0.60);
+  });
+
+  it('ChatではcliSameSessionがtrueでも+10%しない', () => {
+    expect(estimateCacheHitRatio({
+      cacheScenario: 'fourPlusTurns',
+      feature: 'chat',
+      referenceTokens: 10000,
+      cliSameSession: true,
+    })).toBe(0.50);
   });
 });
