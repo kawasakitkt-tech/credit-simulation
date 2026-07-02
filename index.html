@@ -37,7 +37,6 @@
     margin-bottom: 16px;
   }
 
-  .provisional-note,
   .overhead-note,
   .filesize-note {
     max-width: 860px;
@@ -46,16 +45,17 @@
     padding: 10px 14px;
     margin-bottom: 10px;
     font-size: 0.9rem;
+    background: #f6f8fa;
+    color: var(--muted);
   }
 
-  .provisional-note {
-    border-color: var(--warning);
-    background: #fff8f8;
-    color: var(--warning);
-  }
-
-  .overhead-note,
-  .filesize-note {
+  .notice {
+    max-width: 860px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 0.9rem;
     background: #f6f8fa;
     color: var(--muted);
   }
@@ -257,10 +257,6 @@
     Chat / CLI / code review の消費量を事前見積もりし、事務局承認プロセスに活用してください。
   </p>
 
-  <div class="provisional-note">
-    ⚠️ <code>EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE</code> は実測前の暫定値です。<code>src/rates.js</code> の値を確認してください。
-  </div>
-
   <div class="overhead-note">
     ℹ️ Chat/CLI では system prompt・tool definitions 等の見えない文脈分として、機能ごとの概算オーバーヘッド（<code>FEATURE_OVERHEAD_TOKENS</code>）を入力トークンに自動加算しています。
   </div>
@@ -303,8 +299,29 @@
     <label for="outputChars">想定回答文字数</label>
     <input type="number" id="outputChars" value="1500" min="1">
 
-    <label for="cachedInputPct">キャッシュ入力割合 (%)</label>
-    <input type="number" id="cachedInputPct" value="0" min="0" max="100">
+    <label for="cacheScenario">参照情報の再利用状況</label>
+    <select id="cacheScenario">
+      <option value="initial">初回依頼（0%）</option>
+      <option value="noReference">参照情報なし（0%）</option>
+      <option value="secondUse">同じ資料を使う2回目（25%）</option>
+      <option value="twoToThreeTurns">同じ資料で2〜3往復（35%）</option>
+      <option value="fourPlusTurns">同じ資料で4往復以上（50%）</option>
+    </select>
+    <p class="help-text">
+      参照コード・設計書・添付ファイルなど、同じ参照情報を同一セッション内でどの程度再利用するかの想定です。
+      初回依頼や単発利用では0%、同じ資料を継続して使う場合は25〜50%を目安にします。
+      CLIで同一セッションを継続する場合のみ、追加で10%を加算します。
+    </p>
+
+    <div id="cliCacheBonusRow" style="display:none">
+      <label>
+        <input type="checkbox" id="cliSameSession">
+        CLIで同一セッションを継続して利用する（+10%）
+      </label>
+      <p class="help-text">
+        Copilot CLIで同一セッション内に同じ参照情報を使い続ける場合のみ選択してください。
+      </p>
+    </div>
 
     <button type="button" class="btn-calc" id="btnCalcChat">クレジット消費量を計算する</button>
   </div>
@@ -313,6 +330,10 @@
   <div class="card" id="codeReviewForm" style="display:none">
     <h2>Copilot code review</h2>
     <p class="help-text">モデルは GitHub 側で自動選択されるため選択欄はありません。</p>
+    <div class="notice" id="codeReviewNotice">
+      Copilot code review の消費量は、変更行数 × 暫定係数で概算しています。
+      実際の消費量とは差が出る可能性があります。
+    </div>
     <label for="diffLines">変更行数（diff行数）</label>
     <input type="number" id="diffLines" value="200" min="1">
     <button type="button" class="btn-calc" id="btnCalcCodeReview">クレジット消費量を計算する</button>
@@ -326,6 +347,7 @@
         <div class="result-tile"><div class="value" id="resCredits">-</div><div class="label">消費クレジット</div></div>
         <div class="result-tile"><div class="value" id="resUSD">-</div><div class="label">概算金額 (USD)</div></div>
       </div>
+      <p class="help-text" id="cacheInfoText"></p>
       <table><thead><tr><th>内訳</th><th>クレジット</th></tr></thead><tbody id="breakdownBody"></tbody></table>
     </div>
 
