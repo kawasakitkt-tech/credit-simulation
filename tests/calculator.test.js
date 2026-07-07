@@ -1,12 +1,9 @@
 import { describe, it, expect } from '@jest/globals';
-import { MODEL_RATES, USD_PER_CREDIT, EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE, FEATURE_OVERHEAD_TOKENS, EXPERIMENTAL_AGENTIC_PRESETS, EXPERIMENTAL_SUBAGENT_DEFAULTS, ASK_TURN_CACHE_RATIOS } from '../src/rates.js';
+import { MODEL_RATES, USD_PER_CREDIT, FEATURE_OVERHEAD_TOKENS, EXPERIMENTAL_AGENTIC_PRESETS, EXPERIMENTAL_SUBAGENT_DEFAULTS, ASK_TURN_CACHE_RATIOS } from '../src/rates.js';
 import {
   calculateCredits,
   compareModels,
-  calculateCodeReviewCredits,
   creditsToUSD,
-  buildChatCliTokens,
-  estimateCacheHitRatio,
   estimateAgenticTokens,
   buildAskTokens,
   askCacheRatioForTurn,
@@ -20,15 +17,6 @@ describe('rates.js', () => {
 
   it('USD_PER_CREDIT は 0.01', () => {
     expect(USD_PER_CREDIT).toBe(0.01);
-  });
-
-  it('EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE は正の数（暫定値）', () => {
-    expect(EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE).toBeGreaterThan(0);
-  });
-
-  it('FEATURE_OVERHEAD_TOKENS に chat/cli が定義されている', () => {
-    expect(FEATURE_OVERHEAD_TOKENS.chat).toBeGreaterThan(0);
-    expect(FEATURE_OVERHEAD_TOKENS.cli).toBeGreaterThan(0);
   });
 
   it('FEATURE_OVERHEAD_TOKENS に ask/plan/agent が定義されている', () => {
@@ -138,114 +126,9 @@ describe('compareModels', () => {
   });
 });
 
-describe('calculateCodeReviewCredits', () => {
-  it('diffLines × EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE と一致する', () => {
-    const result = calculateCodeReviewCredits(200);
-    expect(result.totalCredits).toBeCloseTo(200 * 0.05, 4);
-  });
-});
-
 describe('creditsToUSD', () => {
   it('credits × 0.01 と一致する', () => {
     expect(creditsToUSD(100)).toBeCloseTo(1.0, 4);
-  });
-});
-
-describe('buildChatCliTokens', () => {
-  it('promptTokens + freshReferenceTokens + historyTokens + overheadTokens を inputTokens にする（chat）', () => {
-    const tokens = buildChatCliTokens({
-      promptTokens: 100,
-      referenceTokens: 1000,
-      historyTokens: 200,
-      outputTokens: 500,
-      cacheHitRatio: 0,
-      feature: 'chat',
-    });
-    // overhead(chat)=1500 固定値。src/rates.js の FEATURE_OVERHEAD_TOKENS.chat と一致させる。
-    expect(tokens.inputTokens).toBe(100 + 1000 + 200 + 1500);
-    expect(tokens.cachedInputTokens).toBe(0);
-  });
-
-  it('cacheHitRatio に応じて cachedInputTokens と freshReferenceTokens に分かれる', () => {
-    const tokens = buildChatCliTokens({
-      promptTokens: 0,
-      referenceTokens: 1000,
-      historyTokens: 0,
-      outputTokens: 0,
-      cacheHitRatio: 0.5,
-      feature: 'chat',
-    });
-    expect(tokens.cachedInputTokens).toBe(500);
-    expect(tokens.inputTokens).toBe(500 + 1500); // freshReference(500) + overhead(1500)
-  });
-});
-
-describe('estimateCacheHitRatio', () => {
-  it('初回依頼は0%', () => {
-    expect(estimateCacheHitRatio({
-      cacheScenario: 'initial',
-      feature: 'chat',
-      referenceTokens: 10000,
-    })).toBe(0);
-  });
-
-  it('参照情報なしは0%', () => {
-    expect(estimateCacheHitRatio({
-      cacheScenario: 'fourPlusTurns',
-      feature: 'chat',
-      referenceTokens: 0,
-    })).toBe(0);
-  });
-
-  it('同じ資料を使う2回目は25%', () => {
-    expect(estimateCacheHitRatio({
-      cacheScenario: 'secondUse',
-      feature: 'chat',
-      referenceTokens: 10000,
-    })).toBe(0.25);
-  });
-
-  it('同じ資料で2〜3往復は35%', () => {
-    expect(estimateCacheHitRatio({
-      cacheScenario: 'twoToThreeTurns',
-      feature: 'chat',
-      referenceTokens: 10000,
-    })).toBe(0.35);
-  });
-
-  it('同じ資料で4往復以上は50%', () => {
-    expect(estimateCacheHitRatio({
-      cacheScenario: 'fourPlusTurns',
-      feature: 'chat',
-      referenceTokens: 10000,
-    })).toBe(0.50);
-  });
-
-  it('CLIで同一セッション継続の場合は+10%', () => {
-    expect(estimateCacheHitRatio({
-      cacheScenario: 'secondUse',
-      feature: 'cli',
-      referenceTokens: 10000,
-      cliSameSession: true,
-    })).toBe(0.35);
-  });
-
-  it('CLI補正込みでも上限は60%', () => {
-    expect(estimateCacheHitRatio({
-      cacheScenario: 'fourPlusTurns',
-      feature: 'cli',
-      referenceTokens: 10000,
-      cliSameSession: true,
-    })).toBe(0.60);
-  });
-
-  it('ChatではcliSameSessionがtrueでも+10%しない', () => {
-    expect(estimateCacheHitRatio({
-      cacheScenario: 'fourPlusTurns',
-      feature: 'chat',
-      referenceTokens: 10000,
-      cliSameSession: true,
-    })).toBe(0.50);
   });
 });
 

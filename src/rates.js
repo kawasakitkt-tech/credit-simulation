@@ -12,15 +12,7 @@ export const FEATURE_OVERHEAD_TOKENS = {
   ask: 1500,
   plan: 4000,
   agent: 6000,
-  chat: 1500, // 旧機能（Task 7 で削除予定）
-  cli: 2500,  // 旧機能（Task 7 で削除予定）
 };
-
-// Copilot code review はモデルをユーザーが選択できないため、
-// PR 変更行数（diff行数）に経験係数を掛けた概算とする。
-// 変数名に EXPERIMENTAL を含め、他のモデル別単価と同列の確からしさに見えないようにする。
-// 要確認: 実測データが無いため暫定値。Phase 1 で実測較正すること。
-export const EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE = 0.05; // 要確認（暫定値）
 
 // Plan/Agent モードの反復シミュレーション用プリセット。
 // iterations: モデル呼び出し回数 / growthPerIterationTokens: 1反復あたりの

@@ -1,6 +1,5 @@
 import {
   MODEL_RATES,
-  EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE,
   USD_PER_CREDIT,
   FEATURE_OVERHEAD_TOKENS,
   ASK_TURN_CACHE_RATIOS,
@@ -66,70 +65,8 @@ export function compareModels(tokens) {
     .sort((a, b) => a.totalCredits - b.totalCredits);
 }
 
-export function calculateCodeReviewCredits(diffLines) {
-  const totalCredits = diffLines * EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE;
-  return {
-    diffLines,
-    totalCredits: round4(totalCredits),
-    totalUSD: round4(creditsToUSD(totalCredits)),
-  };
-}
-
 export function creditsToUSD(credits) {
   return credits * USD_PER_CREDIT;
-}
-
-// Chat/CLI 用の tokens オブジェクトを組み立てる。
-// system prompt / tool definitions / custom instructions 等の見えないオーバーヘッドを
-// FEATURE_OVERHEAD_TOKENS で加算し、cacheHitRatio に応じて reference tokens を
-// cachedInputTokens と freshReferenceTokens に振り分ける。
-export function buildChatCliTokens({
-  promptTokens = 0,
-  referenceTokens = 0,
-  historyTokens = 0,
-  outputTokens = 0,
-  cacheHitRatio = 0,
-  feature = 'chat',
-}) {
-  const normalizedCacheHitRatio = Math.min(Math.max(cacheHitRatio, 0), 1);
-  const overheadTokens = FEATURE_OVERHEAD_TOKENS[feature] ?? 0;
-
-  const cachedInputTokens = Math.ceil(referenceTokens * normalizedCacheHitRatio);
-  const freshReferenceTokens = Math.ceil(referenceTokens * (1 - normalizedCacheHitRatio));
-
-  return {
-    inputTokens: Math.ceil(promptTokens + freshReferenceTokens + historyTokens + overheadTokens),
-    cachedInputTokens,
-    cacheWriteTokens: 0,
-    outputTokens: Math.ceil(outputTokens),
-  };
-}
-
-const CACHE_SCENARIO_BASE_RATIOS = {
-  initial: 0,
-  noReference: 0,
-  secondUse: 0.25,
-  twoToThreeTurns: 0.35,
-  fourPlusTurns: 0.50,
-};
-
-const CLI_SAME_SESSION_BONUS = 0.10;
-const MAX_CACHE_HIT_RATIO = 0.60;
-
-// 参照情報の再利用状況（cacheScenario）から Cached Input 比率を推定する。
-// 利用者が%を直接入力するUIは持たず、この推定値のみを使う。
-export function estimateCacheHitRatio({
-  cacheScenario = 'initial',
-  feature = 'chat',
-  referenceTokens = 0,
-  cliSameSession = false,
-} = {}) {
-  if (referenceTokens <= 0) return 0;
-
-  const baseRatio = CACHE_SCENARIO_BASE_RATIOS[cacheScenario] ?? 0;
-  const cliBonus = feature === 'cli' && cliSameSession ? CLI_SAME_SESSION_BONUS : 0;
-
-  return Math.min(baseRatio + cliBonus, MAX_CACHE_HIT_RATIO);
 }
 
 // エージェントループ（Plan/Agent）のトークンを反復シミュレーションの閉形式で見積もる。
