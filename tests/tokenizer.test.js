@@ -3,6 +3,7 @@ import {
   estimateTextTokens,
   estimateFileTokens,
   estimateHistoryTokens,
+  estimateTokensFromCharCount,
 } from '../src/tokenizer.js';
 
 describe('estimateTextTokens', () => {
@@ -58,9 +59,32 @@ describe('estimateHistoryTokens', () => {
     expect(estimateHistoryTokens(0, 500, 1000)).toBe(0);
   });
 
+  it('1ターン分（ユーザー500字＋アシスタント1000字）は日本語係数0.65で325+650=975トークン', () => {
+    expect(estimateHistoryTokens(1, 500, 1000)).toBe(975);
+  });
+
   it('過去会話ターン数に比例して履歴トークンが増える（累積ではなく線形）', () => {
     const oneTurn = estimateHistoryTokens(1, 500, 1000);
     const twoTurns = estimateHistoryTokens(2, 500, 1000);
     expect(twoTurns).toBeCloseTo(oneTurn * 2, 0);
+  });
+});
+
+describe('estimateTokensFromCharCount', () => {
+  it('日本語係数(既定): 1500字 → 975トークン', () => {
+    expect(estimateTokensFromCharCount(1500)).toBe(975);
+    expect(estimateTokensFromCharCount(1500, 'ja')).toBe(975);
+  });
+
+  it('英語係数: 1000字 → 250トークン', () => {
+    expect(estimateTokensFromCharCount(1000, 'en')).toBe(250);
+  });
+
+  it('0字は0トークン', () => {
+    expect(estimateTokensFromCharCount(0)).toBe(0);
+  });
+
+  it('負の値は0トークンに丸める', () => {
+    expect(estimateTokensFromCharCount(-5)).toBe(0);
   });
 });

@@ -31,8 +31,10 @@ export function calculateCredits(tokens, modelKey) {
   const modelRates = MODEL_RATES[modelKey];
   if (!modelRates) throw new Error(`Unknown model: ${modelKey}`);
 
-  // ロングコンテキスト判定は inputTokens 単体ではなく contextTokens（必須修正4）で行う
-  const contextTokens = inputTokens + cachedInputTokens + cacheWriteTokens;
+  // ロングコンテキスト判定は「1回の呼び出しあたりのコンテキスト量」で行う（プロバイダーの閾値判定はリクエスト単位のため）。
+  // Plan/Agent（複数回のモデル呼び出しをループで合算する）は peakContextTokens（ループ中最大の1回分）を使う。
+  // Ask など単発呼び出しは peakContextTokens を持たないため、従来どおり合計値がそのまま1回分のコンテキストになる。
+  const contextTokens = tokens.peakContextTokens ?? (inputTokens + cachedInputTokens + cacheWriteTokens);
   const rate = pickRateTable(modelRates, contextTokens);
 
   const inputCredits       = toCredits(inputTokens, rate.input);
@@ -92,6 +94,9 @@ export function estimateAgenticTokens({
     cachedInputTokens: Math.ceil((N - 1) * c0 + (g * (N - 1) * (N - 2)) / 2),
     cacheWriteTokens: Math.ceil(c0 + (N - 1) * g),
     outputTokens: Math.ceil(N * o + f),
+    // ループ中で最大となる「1回の呼び出し」のコンテキスト量（= 最終反復時点の蓄積分）。
+    // 長文コンテキスト単価の閾値判定はリクエスト単位のため、合計値ではなくこの値を使う。
+    peakContextTokens: Math.ceil(c0 + (N - 1) * g),
   };
 }
 
@@ -105,6 +110,8 @@ function addTokens(a, b) {
     cachedInputTokens: a.cachedInputTokens + b.cachedInputTokens,
     cacheWriteTokens: a.cacheWriteTokens + b.cacheWriteTokens,
     outputTokens: a.outputTokens + b.outputTokens,
+    // ピークは合算せず最大値を取る（サブエージェントも別リクエストとして課金されるため）
+    peakContextTokens: Math.max(a.peakContextTokens ?? 0, b.peakContextTokens ?? 0),
   };
 }
 

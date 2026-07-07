@@ -12,7 +12,7 @@ import {
 
 describe('rates.js', () => {
   it('MODEL_RATES に登録済みモデルが1つ以上定義されている（数を固定しない）', () => {
-    expect(Object.keys(MODEL_RATES).length).toBeGreaterThanOrEqual(20);
+    expect(Object.keys(MODEL_RATES).length).toBeGreaterThanOrEqual(1);
   });
 
   it('USD_PER_CREDIT は 0.01', () => {
@@ -36,6 +36,27 @@ describe('rates.js', () => {
         expect(p.subagents).toBeGreaterThanOrEqual(0);
       }
     }
+  });
+
+  it('EXPERIMENTAL_AGENTIC_PRESETS の6プリセットが厳密に一致する（転記ミス検知用）', () => {
+    expect(EXPERIMENTAL_AGENTIC_PRESETS.plan.small).toEqual({
+      iterations: 4, growthPerIterationTokens: 3000, outputPerIterationTokens: 300, finalOutputTokens: 2000, subagents: 0,
+    });
+    expect(EXPERIMENTAL_AGENTIC_PRESETS.plan.medium).toEqual({
+      iterations: 8, growthPerIterationTokens: 4000, outputPerIterationTokens: 400, finalOutputTokens: 4000, subagents: 0,
+    });
+    expect(EXPERIMENTAL_AGENTIC_PRESETS.plan.large).toEqual({
+      iterations: 14, growthPerIterationTokens: 5000, outputPerIterationTokens: 500, finalOutputTokens: 8000, subagents: 2,
+    });
+    expect(EXPERIMENTAL_AGENTIC_PRESETS.agent.small).toEqual({
+      iterations: 6, growthPerIterationTokens: 3000, outputPerIterationTokens: 800, finalOutputTokens: 1000, subagents: 0,
+    });
+    expect(EXPERIMENTAL_AGENTIC_PRESETS.agent.medium).toEqual({
+      iterations: 15, growthPerIterationTokens: 4000, outputPerIterationTokens: 1000, finalOutputTokens: 1500, subagents: 1,
+    });
+    expect(EXPERIMENTAL_AGENTIC_PRESETS.agent.large).toEqual({
+      iterations: 30, growthPerIterationTokens: 5000, outputPerIterationTokens: 1200, finalOutputTokens: 2000, subagents: 3,
+    });
   });
 
   it('EXPERIMENTAL_SUBAGENT_DEFAULTS が定義されている', () => {
@@ -111,6 +132,28 @@ describe('calculateCredits', () => {
     expect(result.usedLongContextRate).toBe(true);
   });
 
+  it('peakContextTokens があればそちらでロングコンテキスト判定する（Plan/Agentの1回分コンテキスト）', () => {
+    const tokens = {
+      inputTokens: 0, cachedInputTokens: 2_000_000, cacheWriteTokens: 100_000, outputTokens: 1000,
+      peakContextTokens: 150_000,
+    };
+    // 合計(2,100,000)は閾値超だが、1回分のピーク(150,000)は gpt-5-4 の閾値(272,000)以下 → 通常単価
+    expect(calculateCredits(tokens, 'gpt-5-4').usedLongContextRate).toBe(false);
+  });
+
+  it('peakContextTokens が無ければ従来どおり合計値で判定する', () => {
+    const tokens = { inputTokens: 0, cachedInputTokens: 2_000_000, cacheWriteTokens: 100_000, outputTokens: 1000 };
+    expect(calculateCredits(tokens, 'gpt-5-4').usedLongContextRate).toBe(true);
+  });
+
+  it('peakContextTokens が閾値超過ならロングコンテキスト単価', () => {
+    const tokens = {
+      inputTokens: 0, cachedInputTokens: 2_000_000, cacheWriteTokens: 100_000, outputTokens: 1000,
+      peakContextTokens: 300_000,
+    };
+    expect(calculateCredits(tokens, 'gpt-5-4').usedLongContextRate).toBe(true);
+  });
+
   it('存在しないモデルキーはエラーをスロー', () => {
     expect(() => calculateCredits(baseTokens, 'unknown-model')).toThrow('Unknown model');
   });
@@ -138,10 +181,10 @@ describe('estimateAgenticTokens', () => {
       baseContextTokens: 10000, iterations: 1,
       growthPerIterationTokens: 3000, outputPerIterationTokens: 500, finalOutputTokens: 2000,
     });
-    expect(t).toEqual({ inputTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 10000, outputTokens: 2500 });
+    expect(t).toEqual({ inputTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 10000, outputTokens: 2500, peakContextTokens: 10000 });
   });
 
-  it('N=4 の閉形式: cacheWrite=C0+3G, cachedInput=3C0+3G, output=4O+F', () => {
+  it('N=4 の閉形式: cacheWrite=C0+3G, cachedInput=3C0+3G, output=4O+F, peakContextTokens=C0+3G', () => {
     const t = estimateAgenticTokens({
       baseContextTokens: 10000, iterations: 4,
       growthPerIterationTokens: 3000, outputPerIterationTokens: 500, finalOutputTokens: 2000,
@@ -149,6 +192,8 @@ describe('estimateAgenticTokens', () => {
     expect(t.cacheWriteTokens).toBe(10000 + 3 * 3000);          // 19000
     expect(t.cachedInputTokens).toBe(3 * 10000 + 3000 * 3 * 2 / 2); // 39000
     expect(t.outputTokens).toBe(4 * 500 + 2000);                 // 4000
+    // peakContextTokens = ループ中最大の1回分のコンテキスト = C0+(N-1)*G（実際の課金がリクエスト単位のため）
+    expect(t.peakContextTokens).toBe(10000 + 3 * 3000);          // 19000
   });
 
   it('iterations は最小1にクランプされる', () => {
@@ -196,15 +241,15 @@ describe('buildAskTokens', () => {
     expect(assumptions.cacheRatio).toBe(0);
   });
 
-  it('T=2: 履歴1ターン分が加算され、キャッシュ率25%が参照+履歴に適用される', () => {
+  it('T=2: 履歴1ターン分が加算され、キャッシュ率25%が参照+履歴に適用される（日本語係数0.65）', () => {
     const { tokens, assumptions } = buildAskTokens({
       promptTokens: 0, referenceTokens: 1000, turnNumber: 2, outputTokens: 0,
     });
-    // estimateHistoryTokens(1, 500, 1000) = ceil(500*0.25) + ceil(1000*0.25) = 125 + 250 = 375
-    expect(assumptions.historyTokens).toBe(375);
-    // cacheable = 1000 + 375 = 1375 → cached = ceil(1375 * 0.25) = 344
-    expect(tokens.cachedInputTokens).toBe(344);
-    expect(tokens.inputTokens).toBe(1375 - 344 + 1500);
+    // estimateHistoryTokens(1, 500, 1000) = ceil(500*0.65) + ceil(1000*0.65) = 325 + 650 = 975
+    expect(assumptions.historyTokens).toBe(975);
+    // cacheable = 1000 + 975 = 1975 → cached = ceil(1975 * 0.25) = 494
+    expect(tokens.cachedInputTokens).toBe(494);
+    expect(tokens.inputTokens).toBe(1975 - 494 + 1500);
   });
 
   it('turnNumber は最小1にクランプされる', () => {
@@ -252,6 +297,20 @@ describe('buildAgenticTokens', () => {
     expect(withSub.cacheWriteTokens - base.cacheWriteTokens).toBe(3500 + 5 * 3000);              // 18500
     expect(withSub.cachedInputTokens - base.cachedInputTokens).toBe(5 * 3500 + 3000 * 5 * 4 / 2); // 47500
     expect(withSub.outputTokens - base.outputTokens).toBe(6 * 800);                               // 4800
+  });
+
+  it('peakContextTokens はサブエージェントとの合算時も最大値を取る（合計しない）', () => {
+    const base = buildAgenticTokens({
+      mode: 'plan', taskScale: 'small', promptTokens: 0, referenceTokens: 0, subagents: 0,
+    }).tokens;
+    const withSub = buildAgenticTokens({
+      mode: 'plan', taskScale: 'small', promptTokens: 0, referenceTokens: 0, subagents: 1,
+    }).tokens;
+    // main peak = C0(overhead 4000) + 3*3000 = 13000
+    expect(base.peakContextTokens).toBe(13000);
+    // sub peak = C0_sub(3000) + 5*3000 = 18000 > main peak → 合算後は max(13000, 18000) = 18000（合計 31000 ではない）
+    expect(withSub.peakContextTokens).toBe(18000);
+    expect(withSub.peakContextTokens).not.toBe(base.peakContextTokens + 18000);
   });
 
   it('未知の mode/taskScale はエラーをスロー', () => {

@@ -42,13 +42,21 @@ export function estimateFileTokens(fileSizeKB, fileType, encoding = 'ja') {
   return Math.ceil(fileSizeKB * rate);
 }
 
+// 文字数から直接トークンを見積もる（本文が手元に無い想定入力用）。既定は日本語係数。
+export function estimateTokensFromCharCount(charCount, encoding = 'ja') {
+  const ratio = RATIO[encoding] ?? RATIO.ja;
+  if (!Number.isFinite(charCount) || charCount <= 0) return 0;
+  return Math.ceil(charCount * ratio);
+}
+
 // 今回の1リクエストに含める過去会話ターンの履歴トークンを推定する。
 // 「複数ターンの累積利用量」ではなく、今回送信するコンテキストに乗る履歴量のみを扱う。
+// 本ツールの利用者は日本語での会話を前提とするため、日本語係数(ja)で見積もる。
 export function estimateHistoryTokens(previousTurns, avgUserChars, avgAssistantChars) {
   if (previousTurns <= 0) return 0;
 
-  const userTokens = estimateTextTokens('a'.repeat(avgUserChars));
-  const assistantTokens = estimateTextTokens('a'.repeat(avgAssistantChars));
+  const userTokens = estimateTokensFromCharCount(avgUserChars, 'ja');
+  const assistantTokens = estimateTokensFromCharCount(avgAssistantChars, 'ja');
 
   return Math.ceil(previousTurns * (userTokens + assistantTokens));
 }

@@ -1,5 +1,5 @@
 import { MODEL_RATES, EXPERIMENTAL_AGENTIC_PRESETS } from './rates.js';
-import { estimateTextTokens, estimateFileTokens } from './tokenizer.js';
+import { estimateTextTokens, estimateFileTokens, estimateTokensFromCharCount } from './tokenizer.js';
 import {
   calculateCredits,
   compareModels,
@@ -45,11 +45,11 @@ function intValue(id, fallback) {
 }
 
 function currentMode() {
-  return document.querySelector('input[name="mode"]:checked').value;
+  return document.querySelector('input[name="mode"]:checked')?.value ?? 'ask';
 }
 
 function currentScale() {
-  return document.querySelector('input[name="taskScale"]:checked').value;
+  return document.querySelector('input[name="taskScale"]:checked')?.value ?? 'medium';
 }
 
 // モデルセレクトを provider ごとに <optgroup> でグルーピングして生成
@@ -176,12 +176,12 @@ function bindCalcButton() {
     let built;
     let assumptionText;
     if (mode === 'ask') {
-      const outputChars = Math.max(0, intValue('outputChars', 0));
+      const outputChars = intValue('outputChars', 0);
       built = buildAskTokens({
         promptTokens,
         referenceTokens,
         turnNumber: intValue('turnNumber', 1),
-        outputTokens: estimateTextTokens('a'.repeat(outputChars)),
+        outputTokens: estimateTokensFromCharCount(outputChars, 'ja'),
       });
       assumptionText = askAssumptionText(built.assumptions);
     } else {

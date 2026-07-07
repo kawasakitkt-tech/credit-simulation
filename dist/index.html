@@ -615,13 +615,21 @@ function estimateFileTokens(fileSizeKB, fileType, encoding = 'ja') {
   return Math.ceil(fileSizeKB * rate);
 }
 
+// 文字数から直接トークンを見積もる（本文が手元に無い想定入力用）。既定は日本語係数。
+function estimateTokensFromCharCount(charCount, encoding = 'ja') {
+  const ratio = RATIO[encoding] ?? RATIO.ja;
+  if (!Number.isFinite(charCount) || charCount <= 0) return 0;
+  return Math.ceil(charCount * ratio);
+}
+
 // 今回の1リクエストに含める過去会話ターンの履歴トークンを推定する。
 // 「複数ターンの累積利用量」ではなく、今回送信するコンテキストに乗る履歴量のみを扱う。
+// 本ツールの利用者は日本語での会話を前提とするため、日本語係数(ja)で見積もる。
 function estimateHistoryTokens(previousTurns, avgUserChars, avgAssistantChars) {
   if (previousTurns <= 0) return 0;
 
-  const userTokens = estimateTextTokens('a'.repeat(avgUserChars));
-  const assistantTokens = estimateTextTokens('a'.repeat(avgAssistantChars));
+  const userTokens = estimateTokensFromCharCount(avgUserChars, 'ja');
+  const assistantTokens = estimateTokensFromCharCount(avgAssistantChars, 'ja');
 
   return Math.ceil(previousTurns * (userTokens + assistantTokens));
 }
@@ -652,8 +660,10 @@ function calculateCredits(tokens, modelKey) {
   const modelRates = MODEL_RATES[modelKey];
   if (!modelRates) throw new Error(`Unknown model: ${modelKey}`);
 
-  // ロングコンテキスト判定は inputTokens 単体ではなく contextTokens（必須修正4）で行う
-  const contextTokens = inputTokens + cachedInputTokens + cacheWriteTokens;
+  // ロングコンテキスト判定は「1回の呼び出しあたりのコンテキスト量」で行う（プロバイダーの閾値判定はリクエスト単位のため）。
+  // Plan/Agent（複数回のモデル呼び出しをループで合算する）は peakContextTokens（ループ中最大の1回分）を使う。
+  // Ask など単発呼び出しは peakContextTokens を持たないため、従来どおり合計値がそのまま1回分のコンテキストになる。
+  const contextTokens = tokens.peakContextTokens ?? (inputTokens + cachedInputTokens + cacheWriteTokens);
   const rate = pickRateTable(modelRates, contextTokens);
 
   const inputCredits       = toCredits(inputTokens, rate.input);
@@ -713,6 +723,9 @@ function estimateAgenticTokens({
     cachedInputTokens: Math.ceil((N - 1) * c0 + (g * (N - 1) * (N - 2)) / 2),
     cacheWriteTokens: Math.ceil(c0 + (N - 1) * g),
     outputTokens: Math.ceil(N * o + f),
+    // ループ中で最大となる「1回の呼び出し」のコンテキスト量（= 最終反復時点の蓄積分）。
+    // 長文コンテキスト単価の閾値判定はリクエスト単位のため、合計値ではなくこの値を使う。
+    peakContextTokens: Math.ceil(c0 + (N - 1) * g),
   };
 }
 
@@ -726,6 +739,8 @@ function addTokens(a, b) {
     cachedInputTokens: a.cachedInputTokens + b.cachedInputTokens,
     cacheWriteTokens: a.cacheWriteTokens + b.cacheWriteTokens,
     outputTokens: a.outputTokens + b.outputTokens,
+    // ピークは合算せず最大値を取る（サブエージェントも別リクエストとして課金されるため）
+    peakContextTokens: Math.max(a.peakContextTokens ?? 0, b.peakContextTokens ?? 0),
   };
 }
 
@@ -859,11 +874,11 @@ function intValue(id, fallback) {
 }
 
 function currentMode() {
-  return document.querySelector('input[name="mode"]:checked').value;
+  return document.querySelector('input[name="mode"]:checked')?.value ?? 'ask';
 }
 
 function currentScale() {
-  return document.querySelector('input[name="taskScale"]:checked').value;
+  return document.querySelector('input[name="taskScale"]:checked')?.value ?? 'medium';
 }
 
 // モデルセレクトを provider ごとに <optgroup> でグルーピングして生成
@@ -990,12 +1005,12 @@ function bindCalcButton() {
     let built;
     let assumptionText;
     if (mode === 'ask') {
-      const outputChars = Math.max(0, intValue('outputChars', 0));
+      const outputChars = intValue('outputChars', 0);
       built = buildAskTokens({
         promptTokens,
         referenceTokens,
         turnNumber: intValue('turnNumber', 1),
-        outputTokens: estimateTextTokens('a'.repeat(outputChars)),
+        outputTokens: estimateTokensFromCharCount(outputChars, 'ja'),
       });
       assumptionText = askAssumptionText(built.assumptions);
     } else {
