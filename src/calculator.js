@@ -128,6 +128,32 @@ export function estimateCacheHitRatio({
   return Math.min(baseRatio + cliBonus, MAX_CACHE_HIT_RATIO);
 }
 
+// エージェントループ（Plan/Agent）のトークンを反復シミュレーションの閉形式で見積もる。
+// 1回目: ベースコンテキスト C0 をキャッシュ書き込み。
+// i回目(i>=2): 蓄積済み C0+(i-2)·G をキャッシュ読み込み、新規増分 G をキャッシュ書き込み。
+// 出力は毎反復 O、最終回に F を追加。
+export function estimateAgenticTokens({
+  baseContextTokens = 0,
+  iterations = 1,
+  growthPerIterationTokens = 0,
+  outputPerIterationTokens = 0,
+  finalOutputTokens = 0,
+} = {}) {
+  const clamp0 = (n) => (Number.isFinite(n) && n > 0 ? n : 0);
+  const N = Math.max(1, Math.floor(Number.isFinite(iterations) ? iterations : 1));
+  const c0 = clamp0(baseContextTokens);
+  const g = clamp0(growthPerIterationTokens);
+  const o = clamp0(outputPerIterationTokens);
+  const f = clamp0(finalOutputTokens);
+
+  return {
+    inputTokens: 0,
+    cachedInputTokens: Math.ceil((N - 1) * c0 + (g * (N - 1) * (N - 2)) / 2),
+    cacheWriteTokens: Math.ceil(c0 + (N - 1) * g),
+    outputTokens: Math.ceil(N * o + f),
+  };
+}
+
 function round4(n) {
   return Math.round(n * 10000) / 10000;
 }

@@ -7,6 +7,7 @@ import {
   creditsToUSD,
   buildChatCliTokens,
   estimateCacheHitRatio,
+  estimateAgenticTokens,
 } from '../src/calculator.js';
 
 describe('rates.js', () => {
@@ -206,5 +207,45 @@ describe('estimateCacheHitRatio', () => {
       referenceTokens: 10000,
       cliSameSession: true,
     })).toBe(0.50);
+  });
+});
+
+describe('estimateAgenticTokens', () => {
+  it('N=1 はキャッシュ読み0・書き込みC0のみ、出力は O+F', () => {
+    const t = estimateAgenticTokens({
+      baseContextTokens: 10000, iterations: 1,
+      growthPerIterationTokens: 3000, outputPerIterationTokens: 500, finalOutputTokens: 2000,
+    });
+    expect(t).toEqual({ inputTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 10000, outputTokens: 2500 });
+  });
+
+  it('N=4 の閉形式: cacheWrite=C0+3G, cachedInput=3C0+3G, output=4O+F', () => {
+    const t = estimateAgenticTokens({
+      baseContextTokens: 10000, iterations: 4,
+      growthPerIterationTokens: 3000, outputPerIterationTokens: 500, finalOutputTokens: 2000,
+    });
+    expect(t.cacheWriteTokens).toBe(10000 + 3 * 3000);          // 19000
+    expect(t.cachedInputTokens).toBe(3 * 10000 + 3000 * 3 * 2 / 2); // 39000
+    expect(t.outputTokens).toBe(4 * 500 + 2000);                 // 4000
+  });
+
+  it('iterations は最小1にクランプされる', () => {
+    const t = estimateAgenticTokens({
+      baseContextTokens: 5000, iterations: 0,
+      growthPerIterationTokens: 3000, outputPerIterationTokens: 500, finalOutputTokens: 0,
+    });
+    expect(t.cacheWriteTokens).toBe(5000);
+    expect(t.cachedInputTokens).toBe(0);
+    expect(t.outputTokens).toBe(500);
+  });
+
+  it('負値は0に丸める', () => {
+    const t = estimateAgenticTokens({
+      baseContextTokens: -100, iterations: 2,
+      growthPerIterationTokens: -5, outputPerIterationTokens: 100, finalOutputTokens: 0,
+    });
+    expect(t.cacheWriteTokens).toBe(0);
+    expect(t.cachedInputTokens).toBe(0);
+    expect(t.outputTokens).toBe(200);
   });
 });
