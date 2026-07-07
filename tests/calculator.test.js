@@ -8,6 +8,8 @@ import {
   buildChatCliTokens,
   estimateCacheHitRatio,
   estimateAgenticTokens,
+  buildAskTokens,
+  askCacheRatioForTurn,
 } from '../src/calculator.js';
 
 describe('rates.js', () => {
@@ -283,5 +285,49 @@ describe('estimateAgenticTokens', () => {
     expect(t.cacheWriteTokens).toBe(0);
     expect(t.cachedInputTokens).toBe(0);
     expect(t.outputTokens).toBe(200);
+  });
+});
+
+describe('askCacheRatioForTurn', () => {
+  it('T=1→0%, T=2→25%, T=3〜4→35%, T>=5→50%', () => {
+    expect(askCacheRatioForTurn(1)).toBe(0);
+    expect(askCacheRatioForTurn(2)).toBe(0.25);
+    expect(askCacheRatioForTurn(3)).toBe(0.35);
+    expect(askCacheRatioForTurn(4)).toBe(0.35);
+    expect(askCacheRatioForTurn(5)).toBe(0.50);
+    expect(askCacheRatioForTurn(10)).toBe(0.50);
+  });
+});
+
+describe('buildAskTokens', () => {
+  it('T=1: 履歴0・キャッシュ0%、overhead(ask)=1500 が入力に加算される', () => {
+    const { tokens, assumptions } = buildAskTokens({
+      promptTokens: 100, referenceTokens: 1000, turnNumber: 1, outputTokens: 500,
+    });
+    expect(tokens.inputTokens).toBe(100 + 1000 + 1500);
+    expect(tokens.cachedInputTokens).toBe(0);
+    expect(tokens.cacheWriteTokens).toBe(0);
+    expect(tokens.outputTokens).toBe(500);
+    expect(assumptions.historyTokens).toBe(0);
+    expect(assumptions.cacheRatio).toBe(0);
+  });
+
+  it('T=2: 履歴1ターン分が加算され、キャッシュ率25%が参照+履歴に適用される', () => {
+    const { tokens, assumptions } = buildAskTokens({
+      promptTokens: 0, referenceTokens: 1000, turnNumber: 2, outputTokens: 0,
+    });
+    // estimateHistoryTokens(1, 500, 1000) = ceil(500*0.25) + ceil(1000*0.25) = 125 + 250 = 375
+    expect(assumptions.historyTokens).toBe(375);
+    // cacheable = 1000 + 375 = 1375 → cached = ceil(1375 * 0.25) = 344
+    expect(tokens.cachedInputTokens).toBe(344);
+    expect(tokens.inputTokens).toBe(1375 - 344 + 1500);
+  });
+
+  it('turnNumber は最小1にクランプされる', () => {
+    const { assumptions } = buildAskTokens({
+      promptTokens: 0, referenceTokens: 0, turnNumber: 0, outputTokens: 0,
+    });
+    expect(assumptions.turnNumber).toBe(1);
+    expect(assumptions.cacheRatio).toBe(0);
   });
 });

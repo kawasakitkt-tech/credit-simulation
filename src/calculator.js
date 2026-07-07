@@ -3,7 +3,9 @@ import {
   EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE,
   USD_PER_CREDIT,
   FEATURE_OVERHEAD_TOKENS,
+  ASK_TURN_CACHE_RATIOS,
 } from './rates.js';
+import { estimateHistoryTokens } from './tokenizer.js';
 
 function pickRateTable(modelRates, contextTokens) {
   if (modelRates.longContext && contextTokens > modelRates.longContext.thresholdTokens) {
@@ -156,4 +158,43 @@ export function estimateAgenticTokens({
 
 function round4(n) {
   return Math.round(n * 10000) / 10000;
+}
+
+// 「何回目のやり取りか」からキャッシュヒット率を推定する。
+export function askCacheRatioForTurn(turnNumber) {
+  const entry = ASK_TURN_CACHE_RATIOS.find((e) => turnNumber >= e.minTurn);
+  return entry ? entry.ratio : 0;
+}
+
+// Ask モード（1回のモデル呼び出し）の tokens を組み立てる。
+// turnNumber(T) が履歴トークンとキャッシュ率の両方を駆動する:
+//  - 履歴: (T-1)ターン × 平均ターンサイズ（ユーザー500文字＋アシスタント1,000文字）
+//  - キャッシュ率: askCacheRatioForTurn(T) を参照情報＋履歴に適用
+const ASK_AVG_USER_CHARS = 500;
+const ASK_AVG_ASSISTANT_CHARS = 1000;
+
+export function buildAskTokens({
+  promptTokens = 0,
+  referenceTokens = 0,
+  turnNumber = 1,
+  outputTokens = 0,
+} = {}) {
+  const T = Math.max(1, Math.floor(Number.isFinite(turnNumber) ? turnNumber : 1));
+  const overheadTokens = FEATURE_OVERHEAD_TOKENS.ask;
+  const historyTokens = estimateHistoryTokens(T - 1, ASK_AVG_USER_CHARS, ASK_AVG_ASSISTANT_CHARS);
+  const cacheRatio = askCacheRatioForTurn(T);
+
+  const cacheableTokens = referenceTokens + historyTokens;
+  const cachedInputTokens = Math.ceil(cacheableTokens * cacheRatio);
+  const freshTokens = cacheableTokens - cachedInputTokens;
+
+  return {
+    tokens: {
+      inputTokens: Math.ceil(overheadTokens + promptTokens + freshTokens),
+      cachedInputTokens,
+      cacheWriteTokens: 0,
+      outputTokens: Math.ceil(outputTokens),
+    },
+    assumptions: { turnNumber: T, cacheRatio, historyTokens },
+  };
 }
