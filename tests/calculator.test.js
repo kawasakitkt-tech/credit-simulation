@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { MODEL_RATES, USD_PER_CREDIT, EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE, FEATURE_OVERHEAD_TOKENS } from '../src/rates.js';
+import { MODEL_RATES, USD_PER_CREDIT, EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE, FEATURE_OVERHEAD_TOKENS, EXPERIMENTAL_AGENTIC_PRESETS, EXPERIMENTAL_SUBAGENT_DEFAULTS, ASK_TURN_CACHE_RATIOS } from '../src/rates.js';
 import {
   calculateCredits,
   compareModels,
@@ -26,6 +26,42 @@ describe('rates.js', () => {
   it('FEATURE_OVERHEAD_TOKENS に chat/cli が定義されている', () => {
     expect(FEATURE_OVERHEAD_TOKENS.chat).toBeGreaterThan(0);
     expect(FEATURE_OVERHEAD_TOKENS.cli).toBeGreaterThan(0);
+  });
+
+  it('FEATURE_OVERHEAD_TOKENS に ask/plan/agent が定義されている', () => {
+    expect(FEATURE_OVERHEAD_TOKENS.ask).toBeGreaterThan(0);
+    expect(FEATURE_OVERHEAD_TOKENS.plan).toBeGreaterThan(0);
+    expect(FEATURE_OVERHEAD_TOKENS.agent).toBeGreaterThan(0);
+  });
+
+  it('EXPERIMENTAL_AGENTIC_PRESETS に plan/agent × small/medium/large が定義されている', () => {
+    for (const mode of ['plan', 'agent']) {
+      for (const scale of ['small', 'medium', 'large']) {
+        const p = EXPERIMENTAL_AGENTIC_PRESETS[mode][scale];
+        expect(p.iterations).toBeGreaterThan(0);
+        expect(p.growthPerIterationTokens).toBeGreaterThan(0);
+        expect(p.outputPerIterationTokens).toBeGreaterThan(0);
+        expect(p.finalOutputTokens).toBeGreaterThanOrEqual(0);
+        expect(p.subagents).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('EXPERIMENTAL_SUBAGENT_DEFAULTS が定義されている', () => {
+    expect(EXPERIMENTAL_SUBAGENT_DEFAULTS.iterations).toBeGreaterThan(0);
+    expect(EXPERIMENTAL_SUBAGENT_DEFAULTS.baseContextTokens).toBeGreaterThan(0);
+    expect(EXPERIMENTAL_SUBAGENT_DEFAULTS.referenceShareRatio).toBeGreaterThan(0);
+    expect(EXPERIMENTAL_SUBAGENT_DEFAULTS.referenceShareRatio).toBeLessThanOrEqual(1);
+  });
+
+  it('ASK_TURN_CACHE_RATIOS は minTurn 降順で ratio 0〜1', () => {
+    for (let i = 1; i < ASK_TURN_CACHE_RATIOS.length; i++) {
+      expect(ASK_TURN_CACHE_RATIOS[i].minTurn).toBeLessThan(ASK_TURN_CACHE_RATIOS[i - 1].minTurn);
+    }
+    for (const e of ASK_TURN_CACHE_RATIOS) {
+      expect(e.ratio).toBeGreaterThanOrEqual(0);
+      expect(e.ratio).toBeLessThanOrEqual(1);
+    }
   });
 });
 

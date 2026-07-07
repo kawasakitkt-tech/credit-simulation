@@ -5,12 +5,15 @@
 // 出典: 事務局提供の単価表（2026-07-01 時点）
 export const USD_PER_CREDIT = 0.01;
 
-// Chat/CLI利用時、ユーザー入力とは別に system prompt / tool definitions /
+// モード利用時、ユーザー入力とは別に system prompt / tool definitions /
 // custom instructions 等の見えない文脈が消費するトークンの概算固定値。
-// TODO: 実測データが無いため暫定値。Phase 1 で実測較正すること。
+// Plan/Agent はツール定義が多いため大きい。要確認（暫定値）。実測データ取得後に較正すること。
 export const FEATURE_OVERHEAD_TOKENS = {
-  chat: 1500,
-  cli: 2500,
+  ask: 1500,
+  plan: 4000,
+  agent: 6000,
+  chat: 1500, // 旧機能（Task 7 で削除予定）
+  cli: 2500,  // 旧機能（Task 7 で削除予定）
 };
 
 // Copilot code review はモデルをユーザーが選択できないため、
@@ -18,6 +21,46 @@ export const FEATURE_OVERHEAD_TOKENS = {
 // 変数名に EXPERIMENTAL を含め、他のモデル別単価と同列の確からしさに見えないようにする。
 // 要確認: 実測データが無いため暫定値。Phase 1 で実測較正すること。
 export const EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE = 0.05; // 要確認（暫定値）
+
+// Plan/Agent モードの反復シミュレーション用プリセット。
+// iterations: モデル呼び出し回数 / growthPerIterationTokens: 1反復あたりの
+// コンテキスト増分（ツール実行結果＋前回出力）/ outputPerIterationTokens: 1反復
+// あたりの出力 / finalOutputTokens: 最終成果物（Plan=計画書, Agent=コード＋説明）/
+// subagents: サブエージェント数。
+// 変数名に EXPERIMENTAL を含め、モデル単価と同列の確からしさに見せない。
+// 要確認（暫定値）: 実測データが無い。実測後に較正すること。
+export const EXPERIMENTAL_AGENTIC_PRESETS = {
+  plan: {
+    small:  { iterations: 4,  growthPerIterationTokens: 3000, outputPerIterationTokens: 300,  finalOutputTokens: 2000, subagents: 0 },
+    medium: { iterations: 8,  growthPerIterationTokens: 4000, outputPerIterationTokens: 400,  finalOutputTokens: 4000, subagents: 0 },
+    large:  { iterations: 14, growthPerIterationTokens: 5000, outputPerIterationTokens: 500,  finalOutputTokens: 8000, subagents: 2 },
+  },
+  agent: {
+    small:  { iterations: 6,  growthPerIterationTokens: 3000, outputPerIterationTokens: 800,  finalOutputTokens: 1000, subagents: 0 },
+    medium: { iterations: 15, growthPerIterationTokens: 4000, outputPerIterationTokens: 1000, finalOutputTokens: 1500, subagents: 1 },
+    large:  { iterations: 30, growthPerIterationTokens: 5000, outputPerIterationTokens: 1200, finalOutputTokens: 2000, subagents: 3 },
+  },
+};
+
+// サブエージェント1体分の固定小型ループ。baseContextTokens はタスク説明ぶんで、
+// これにメイン参照トークン × referenceShareRatio を加えたものが C0 になる。
+// 要確認（暫定値）。
+export const EXPERIMENTAL_SUBAGENT_DEFAULTS = {
+  iterations: 6,
+  baseContextTokens: 3000,
+  referenceShareRatio: 0.5,
+  growthPerIterationTokens: 3000,
+  outputPerIterationTokens: 800,
+};
+
+// Ask モードの「何回目のやり取りか(T)」→ キャッシュヒット率。
+// minTurn 降順に評価し、最初に T >= minTurn を満たした ratio を使う（該当なし＝T=1 は 0）。
+// 要確認（暫定値）。
+export const ASK_TURN_CACHE_RATIOS = [
+  { minTurn: 5, ratio: 0.50 },
+  { minTurn: 3, ratio: 0.35 },
+  { minTurn: 2, ratio: 0.25 },
+];
 
 const CLAUDE_SONNET_4_RATE = { input: 3.00, cachedInput: 0.30, cacheWrite: 3.75, output: 15.00 };
 const CLAUDE_OPUS_4_RATE   = { input: 5.00, cachedInput: 0.50, cacheWrite: 6.25, output: 25.00 };
