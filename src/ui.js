@@ -1,16 +1,15 @@
-import { MODEL_RATES } from './rates.js';
-import { estimateTextTokens, estimateFileTokens, estimateHistoryTokens } from './tokenizer.js';
+import { MODEL_RATES, EXPERIMENTAL_AGENTIC_PRESETS } from './rates.js';
+import { estimateTextTokens, estimateFileTokens } from './tokenizer.js';
 import {
-  buildChatCliTokens,
   calculateCredits,
   compareModels,
-  calculateCodeReviewCredits,
-  creditsToUSD,
-  estimateCacheHitRatio,
+  buildAskTokens,
+  buildAgenticTokens,
 } from './calculator.js';
 
 const FILE_TYPE_OPTIONS = [
   { value: 'md', label: 'Markdown / テキスト' },
+  { value: 'code', label: 'ソースコード / フォルダ' },
   { value: 'pdf', label: 'PDF' },
   { value: 'docx', label: 'Word (.docx)' },
   { value: 'pptx', label: 'PowerPoint (.pptx)' },
@@ -19,18 +18,18 @@ const FILE_TYPE_OPTIONS = [
 
 const BREAKDOWN_LABELS = {
   inputCredits: '入力',
-  cachedInputCredits: 'キャッシュ入力',
+  cachedInputCredits: 'キャッシュ読み込み',
   cacheWriteCredits: 'キャッシュ書き込み',
   outputCredits: '出力',
 };
 
-const CACHE_SCENARIO_LABELS = {
-  initial: '初回依頼',
-  noReference: '参照情報なし',
-  secondUse: '同じ資料を使う2回目',
-  twoToThreeTurns: '同じ資料で2〜3往復',
-  fourPlusTurns: '同じ資料で4往復以上',
+const MODE_DESCRIPTIONS = {
+  ask: 'Ask は1回のモデル呼び出しで回答を得るモードです。会話が進むほど履歴分の入力が増え、同じ参照情報にはキャッシュ割引が効きます。',
+  plan: 'Plan はコードベースを探索して実装計画書を作るモードです。内部でモデル呼び出しが複数回起こる前提で概算します。',
+  agent: 'Agent は自律的にコードを編集・実行するモードです。反復回数とサブエージェント数に応じて消費が大きく変わります。',
 };
+
+const SCALE_LABELS = { small: '軽微', medium: '中規模', large: '大規模' };
 
 function formatCredits(credits) {
   return credits.toLocaleString('ja-JP', { maximumFractionDigits: 4 });
@@ -38,6 +37,19 @@ function formatCredits(credits) {
 
 function formatUSD(usd) {
   return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+}
+
+function intValue(id, fallback) {
+  const n = parseInt(document.getElementById(id).value, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function currentMode() {
+  return document.querySelector('input[name="mode"]:checked').value;
+}
+
+function currentScale() {
+  return document.querySelector('input[name="taskScale"]:checked').value;
 }
 
 // モデルセレクトを provider ごとに <optgroup> でグルーピングして生成
@@ -64,33 +76,7 @@ function populateModelSelect() {
   });
 }
 
-// featureMode の切り替えで chatCliForm / codeReviewForm の表示を切り替え、
-// codeReview 選択時は comparisonCard を非表示にする。
-// フォームを切り替えたら #results も一旦隠し、再計算を促す。
-function bindFeatureModeToggle() {
-  const featureModeSelect = document.getElementById('featureMode');
-  const chatCliForm = document.getElementById('chatCliForm');
-  const codeReviewForm = document.getElementById('codeReviewForm');
-  const results = document.getElementById('results');
-  const comparisonCard = document.getElementById('comparisonCard');
-  const cliCacheBonusRow = document.getElementById('cliCacheBonusRow');
-
-  const applyMode = () => {
-    const mode = featureModeSelect.value;
-    const isCodeReview = mode === 'codeReview';
-    chatCliForm.style.display = isCodeReview ? 'none' : '';
-    codeReviewForm.style.display = isCodeReview ? '' : 'none';
-    comparisonCard.style.display = isCodeReview ? 'none' : '';
-    cliCacheBonusRow.style.display = mode === 'cli' ? '' : 'none';
-    results.style.display = 'none';
-  };
-
-  featureModeSelect.addEventListener('change', applyMode);
-  applyMode();
-}
-
-// 添付ファイル行を1件 #fileList に追加する。
-// 行には「ファイル種別セレクト」「サイズ(KB)入力」「削除ボタン」を持たせる。
+// 参照ファイル行を1件 #fileList に追加する
 function addFileRow() {
   const fileList = document.getElementById('fileList');
 
@@ -127,74 +113,144 @@ function addFileRow() {
   fileList.appendChild(row);
 }
 
-// プロンプト・参照テキスト・添付ファイル・過去会話ターン数からトークンを集計し、
-// cacheScenario/cliSameSession から estimateCacheHitRatio でキャッシュ率を自動算出したうえで
-// buildChatCliTokens に渡して tokens オブジェクトを組み立てる。
-// 戻り値には結果表示用のキャッシュ内訳情報 (cacheInfo) も含む。
-function collectChatCliTokens(feature) {
-  const promptTokens = estimateTextTokens(document.getElementById('promptText').value);
-  const contextTokens = estimateTextTokens(document.getElementById('contextText').value);
+// Plan/Agent の詳細調整欄へ現在のタスク規模のプリセット値を反映する。
+// タスク規模を切り替えるとユーザーの編集値はプリセットに戻る仕様。
+function applyPresetToAdjustments() {
+  const mode = currentMode();
+  if (mode === 'ask') return;
+  const preset = EXPERIMENTAL_AGENTIC_PRESETS[mode][currentScale()];
+  document.getElementById('adjIterations').value = preset.iterations;
+  document.getElementById('adjGrowth').value = preset.growthPerIterationTokens;
+  document.getElementById('adjOutputPerIter').value = preset.outputPerIterationTokens;
+  document.getElementById('adjFinalOutput').value = preset.finalOutputTokens;
+  document.getElementById('adjSubagents').value = preset.subagents;
+}
 
-  let fileTokens = 0;
+// モード切替: Ask 専用欄 / Plan・Agent 専用欄の表示を切り替え、結果を隠す
+function applyMode() {
+  const mode = currentMode();
+  const isAsk = mode === 'ask';
+  document.getElementById('askTurnField').hidden = !isAsk;
+  document.getElementById('askOutputField').hidden = !isAsk;
+  document.getElementById('scaleField').hidden = isAsk;
+  document.getElementById('adjustField').hidden = isAsk;
+  document.getElementById('modeDescription').textContent = MODE_DESCRIPTIONS[mode];
+  document.getElementById('results').hidden = true;
+  applyPresetToAdjustments();
+}
+
+// 参照テキスト＋参照ファイル行のトークンを合算する
+function collectReferenceTokens() {
+  let tokens = estimateTextTokens(document.getElementById('contextText').value);
   document.querySelectorAll('.file-item').forEach((row) => {
     const fileType = row.querySelector('.file-type').value;
     const fileSizeKB = parseFloat(row.querySelector('.file-kb-input').value) || 0;
-    fileTokens += estimateFileTokens(fileSizeKB, fileType, 'ja');
+    tokens += estimateFileTokens(fileSizeKB, fileType, 'ja');
   });
-
-  const historyTurns = parseInt(document.getElementById('historyTurns').value, 10) || 0;
-  const historyTokens = estimateHistoryTokens(historyTurns, /* avgUserChars */ 500, /* avgAssistantChars */ 1000);
-
-  const outputChars = parseInt(document.getElementById('outputChars').value, 10) || 0;
-  const outputTokens = estimateTextTokens('a'.repeat(outputChars));
-
-  const referenceTokens = contextTokens + fileTokens;
-  const cacheScenario = document.getElementById('cacheScenario').value;
-  const cliSameSession = document.getElementById('cliSameSession').checked;
-
-  const cacheHitRatio = estimateCacheHitRatio({
-    cacheScenario,
-    feature,
-    referenceTokens,
-    cliSameSession,
-  });
-
-  const tokens = buildChatCliTokens({
-    promptTokens,
-    referenceTokens,
-    historyTokens,
-    outputTokens,
-    cacheHitRatio,
-    feature,
-  });
-
-  const cacheInfo = {
-    cacheScenarioLabel: CACHE_SCENARIO_LABELS[cacheScenario] ?? cacheScenario,
-    cacheHitRatio,
-    cachedInputTokens: tokens.cachedInputTokens,
-    freshReferenceTokens: Math.ceil(referenceTokens * (1 - cacheHitRatio)),
-  };
-
-  return { tokens, cacheInfo };
+  return tokens;
 }
 
-function bindCalcChatButton() {
-  document.getElementById('btnCalcChat').addEventListener('click', () => {
-    const feature = document.getElementById('featureMode').value; // 'chat' | 'cli'
-    const { tokens, cacheInfo } = collectChatCliTokens(feature);
+function askAssumptionText(assumptions) {
+  return (
+    `${assumptions.turnNumber}回目のやり取り / ` +
+    `キャッシュ率 ${Math.round(assumptions.cacheRatio * 100)}% / ` +
+    `履歴 ${assumptions.historyTokens.toLocaleString('ja-JP')} tokens`
+  );
+}
+
+function agenticAssumptionText(assumptions) {
+  return (
+    `規模: ${SCALE_LABELS[assumptions.taskScale] ?? assumptions.taskScale} / ` +
+    `反復 ${assumptions.iterations}回 / ` +
+    `サブエージェント ${assumptions.subagents}体 / ` +
+    `増分 ${assumptions.growthPerIterationTokens.toLocaleString('ja-JP')} tokens/反復`
+  );
+}
+
+function bindCalcButton() {
+  document.getElementById('btnCalc').addEventListener('click', () => {
+    const mode = currentMode();
+    const promptTokens = estimateTextTokens(document.getElementById('promptText').value);
+    const referenceTokens = collectReferenceTokens();
+
+    let built;
+    let assumptionText;
+    if (mode === 'ask') {
+      const outputChars = Math.max(0, intValue('outputChars', 0));
+      built = buildAskTokens({
+        promptTokens,
+        referenceTokens,
+        turnNumber: intValue('turnNumber', 1),
+        outputTokens: estimateTextTokens('a'.repeat(outputChars)),
+      });
+      assumptionText = askAssumptionText(built.assumptions);
+    } else {
+      built = buildAgenticTokens({
+        mode,
+        taskScale: currentScale(),
+        promptTokens,
+        referenceTokens,
+        iterations: intValue('adjIterations', undefined),
+        growthPerIterationTokens: intValue('adjGrowth', undefined),
+        outputPerIterationTokens: intValue('adjOutputPerIter', undefined),
+        finalOutputTokens: intValue('adjFinalOutput', undefined),
+        subagents: intValue('adjSubagents', undefined),
+      });
+      assumptionText = agenticAssumptionText(built.assumptions);
+    }
+
     const modelId = document.getElementById('modelId').value;
-    const result = calculateCredits(tokens, modelId);
-    const comparisons = compareModels(tokens);
-    renderChatResult(result, comparisons, cacheInfo);
+    const result = calculateCredits(built.tokens, modelId);
+    const comparisons = compareModels(built.tokens);
+    renderResult(result, comparisons, assumptionText);
   });
 }
 
-function bindCalcCodeReviewButton() {
-  document.getElementById('btnCalcCodeReview').addEventListener('click', () => {
-    const diffLines = parseInt(document.getElementById('diffLines').value, 10) || 0;
-    const result = calculateCodeReviewCredits(diffLines);
-    renderCodeReviewResult(result);
+// #resCredits / #resUSD / #assumptionText / #breakdownBody / #comparisonBody を更新して表示する
+function renderResult(result, comparisons, assumptionText) {
+  document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
+  document.getElementById('resUSD').textContent = `約 ${formatUSD(result.totalUSD)}`;
+  document.getElementById('assumptionText').textContent = assumptionText;
+
+  const breakdownBody = document.getElementById('breakdownBody');
+  breakdownBody.innerHTML = '';
+  Object.entries(result.breakdown)
+    .filter(([, credits]) => credits > 0)
+    .forEach(([key, credits]) => {
+      const tr = document.createElement('tr');
+      const labelTd = document.createElement('td');
+      labelTd.textContent = BREAKDOWN_LABELS[key] ?? key;
+      const creditsTd = document.createElement('td');
+      creditsTd.textContent = formatCredits(credits);
+      tr.appendChild(labelTd);
+      tr.appendChild(creditsTd);
+      breakdownBody.appendChild(tr);
+    });
+
+  const comparisonBody = document.getElementById('comparisonBody');
+  comparisonBody.innerHTML = '';
+  comparisons.forEach((comparison) => {
+    const modelRate = MODEL_RATES[comparison.modelKey] ?? {};
+    const tr = document.createElement('tr');
+    if (comparison.modelKey === result.modelKey) {
+      tr.className = 'selected-model';
+    }
+    const modelTd = document.createElement('td');
+    modelTd.textContent = comparison.label;
+    const providerTd = document.createElement('td');
+    providerTd.textContent = modelRate.provider ?? '-';
+    const creditsTd = document.createElement('td');
+    creditsTd.textContent = formatCredits(comparison.totalCredits);
+    const usdTd = document.createElement('td');
+    usdTd.textContent = formatUSD(comparison.totalUSD);
+    tr.appendChild(modelTd);
+    tr.appendChild(providerTd);
+    tr.appendChild(creditsTd);
+    tr.appendChild(usdTd);
+    comparisonBody.appendChild(tr);
   });
+
+  document.getElementById('results').hidden = false;
 }
 
 // トークン数ヒントをライブ更新する（input イベント）
@@ -218,95 +274,18 @@ function bindTokenHints() {
   updateContextHint();
 }
 
-function bindFileRowHandlers() {
-  document.getElementById('btnAddFile').addEventListener('click', () => {
-    addFileRow();
+function bindModeAndScale() {
+  document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+    radio.addEventListener('change', applyMode);
   });
-}
-
-// #resCredits, #resUSD, #breakdownBody, #comparisonBody (chat/CLIのみ) を更新し #results を表示する
-function renderChatResult(result, comparisons, cacheInfo) {
-  const resultsEl = document.getElementById('results');
-  const comparisonCard = document.getElementById('comparisonCard');
-
-  document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
-  document.getElementById('resUSD').textContent = formatUSD(result.totalUSD);
-
-  const cacheInfoText = document.getElementById('cacheInfoText');
-  cacheInfoText.textContent =
-    `参照情報の再利用状況: ${cacheInfo.cacheScenarioLabel} / ` +
-    `適用キャッシュ率: ${Math.round(cacheInfo.cacheHitRatio * 100)}% / ` +
-    `通常Input扱い: ${cacheInfo.freshReferenceTokens.toLocaleString('ja-JP')} tokens / ` +
-    `Cached Input扱い: ${cacheInfo.cachedInputTokens.toLocaleString('ja-JP')} tokens`;
-
-  const breakdownBody = document.getElementById('breakdownBody');
-  breakdownBody.innerHTML = '';
-  Object.entries(result.breakdown)
-    .filter(([, credits]) => credits > 0)
-    .forEach(([key, credits]) => {
-      const tr = document.createElement('tr');
-      const labelTd = document.createElement('td');
-      labelTd.textContent = BREAKDOWN_LABELS[key] ?? key;
-      const creditsTd = document.createElement('td');
-      creditsTd.textContent = formatCredits(credits);
-      tr.appendChild(labelTd);
-      tr.appendChild(creditsTd);
-      breakdownBody.appendChild(tr);
-    });
-
-  const comparisonBody = document.getElementById('comparisonBody');
-  comparisonBody.innerHTML = '';
-  comparisons.forEach((comparison) => {
-    const modelRate = MODEL_RATES[comparison.modelKey] ?? {};
-    const tr = document.createElement('tr');
-    if (comparison.modelKey === result.modelKey) {
-      tr.style.fontWeight = '600';
-    }
-    const modelTd = document.createElement('td');
-    modelTd.textContent = comparison.label;
-    const providerTd = document.createElement('td');
-    providerTd.textContent = modelRate.provider ?? '-';
-    const creditsTd = document.createElement('td');
-    creditsTd.textContent = formatCredits(comparison.totalCredits);
-    const usdTd = document.createElement('td');
-    usdTd.textContent = formatUSD(comparison.totalUSD);
-    tr.appendChild(modelTd);
-    tr.appendChild(providerTd);
-    tr.appendChild(creditsTd);
-    tr.appendChild(usdTd);
-    comparisonBody.appendChild(tr);
+  document.querySelectorAll('input[name="taskScale"]').forEach((radio) => {
+    radio.addEventListener('change', applyPresetToAdjustments);
   });
-
-  comparisonCard.style.display = '';
-  resultsEl.style.display = '';
-}
-
-function renderCodeReviewResult(result) {
-  const resultsEl = document.getElementById('results');
-  const comparisonCard = document.getElementById('comparisonCard');
-
-  document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
-  document.getElementById('resUSD').textContent = formatUSD(result.totalUSD);
-  document.getElementById('cacheInfoText').textContent = '';
-
-  const breakdownBody = document.getElementById('breakdownBody');
-  breakdownBody.innerHTML = '';
-  const tr = document.createElement('tr');
-  const labelTd = document.createElement('td');
-  labelTd.textContent = `code review（${result.diffLines} 行の暫定係数）`;
-  const creditsTd = document.createElement('td');
-  creditsTd.textContent = formatCredits(result.totalCredits);
-  tr.appendChild(labelTd);
-  tr.appendChild(creditsTd);
-  breakdownBody.appendChild(tr);
-
-  comparisonCard.style.display = 'none';
-  resultsEl.style.display = '';
 }
 
 populateModelSelect();
-bindFeatureModeToggle();
-bindCalcChatButton();
-bindCalcCodeReviewButton();
+bindModeAndScale();
+bindCalcButton();
 bindTokenHints();
-bindFileRowHandlers();
+document.getElementById('btnAddFile').addEventListener('click', addFileRow);
+applyMode();
