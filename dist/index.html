@@ -3,100 +3,140 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GitHub Copilot クレジット消費量計算ツール</title>
+<title>Copilot クレジット計算</title>
 <style>
   :root {
-    --border: #d0d7de;
-    --accent: #0969da;
-    --warning: #cf222e;
-    --bg: #f6f8fa;
-    --card-bg: #ffffff;
-    --text: #1f2328;
-    --muted: #57606a;
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --divider: #d2d2d7;
+    --radius-card: 18px;
+    --radius-input: 12px;
   }
 
   * { box-sizing: border-box; }
 
   body {
-    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    margin: 0;
     background: var(--bg);
     color: var(--text);
-    margin: 0;
-    padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro JP", "Hiragino Sans", "Yu Gothic UI", "Segoe UI", sans-serif;
     line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
   }
 
-  h1 {
-    font-size: 1.5rem;
-    margin-bottom: 4px;
+  .container {
+    max-width: 980px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 4vw, 40px);
+    padding-bottom: 80px;
   }
 
-  .subtitle {
+  .hero {
+    text-align: center;
+    padding: clamp(40px, 8vw, 80px) 0 clamp(16px, 3vw, 32px);
+  }
+
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+
+  .hero .subtitle {
     color: var(--muted);
-    max-width: 860px;
-    margin-bottom: 16px;
+    font-size: clamp(15px, 2vw, 19px);
+    max-width: 640px;
+    margin: 0 auto;
   }
 
-  .overhead-note,
-  .filesize-note {
-    max-width: 860px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 10px;
-    font-size: 0.9rem;
-    background: #f6f8fa;
-    color: var(--muted);
+  .segment-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0 8px;
   }
 
-  .notice {
-    max-width: 860px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 14px;
-    font-size: 0.9rem;
-    background: #f6f8fa;
+  .segmented {
+    display: inline-flex;
+    background: #e8e8ed;
+    border-radius: 980px;
+    padding: 3px;
+  }
+
+  .segmented input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .segmented label {
+    padding: 8px clamp(16px, 3vw, 28px);
+    border-radius: 980px;
+    font-size: 15px;
+    cursor: pointer;
+    color: var(--text);
+    transition: background .2s ease, box-shadow .2s ease;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .segmented input:checked + label {
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+    font-weight: 600;
+  }
+
+  .mode-description {
+    text-align: center;
     color: var(--muted);
+    font-size: 14px;
+    max-width: 620px;
+    margin: 8px auto 32px;
   }
 
   .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 16px;
-    max-width: 860px;
+    background: var(--card);
+    border-radius: var(--radius-card);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, .06);
+    padding: clamp(20px, 4vw, 36px);
+    margin-bottom: 24px;
   }
 
   .card h2 {
-    font-size: 1.1rem;
-    margin-top: 0;
-    margin-bottom: 14px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 8px;
+    font-size: clamp(19px, 2.5vw, 24px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
   }
 
-  label {
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px 24px;
+  }
+
+  .field.span-full { grid-column: 1 / -1; }
+  .field[hidden] { display: none; }
+
+  .field-label {
     display: block;
     font-weight: 600;
-    margin-top: 14px;
-    margin-bottom: 4px;
-    font-size: 0.9rem;
-  }
-
-  label:first-of-type {
-    margin-top: 0;
+    font-size: 14px;
+    margin-bottom: 6px;
   }
 
   select,
   textarea,
   input[type="number"] {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.95rem;
+    padding: 10px 14px;
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-input);
+    font-size: 15px;
     font-family: inherit;
     background: #fff;
     color: var(--text);
@@ -107,257 +147,293 @@
   input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
   }
 
   textarea {
-    min-height: 90px;
+    min-height: 100px;
     resize: vertical;
   }
 
   .help-text {
     display: block;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: 12px;
     margin-top: 4px;
   }
 
-  #fileList {
-    margin-top: 10px;
-  }
+  #fileList { margin-bottom: 8px; }
 
   .file-item {
     display: flex;
     gap: 8px;
     align-items: center;
     margin-bottom: 8px;
+    flex-wrap: wrap;
   }
 
-  .file-item select {
-    flex: 0 0 auto;
-    width: auto;
-  }
-
-  .file-item .file-kb-input {
-    flex: 0 0 100px;
-    width: 100px;
-  }
+  .file-item select { flex: 1 1 180px; width: auto; }
+  .file-item .file-kb-input { flex: 0 0 110px; width: 110px; }
 
   .file-item .file-remove {
     flex: 0 0 auto;
     background: none;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--warning);
-    padding: 6px 10px;
-    cursor: pointer;
-  }
-
-  .file-item .file-remove:hover {
-    background: #fff1f0;
-  }
-
-  button {
+    border: 1px solid var(--divider);
+    border-radius: 980px;
+    color: var(--muted);
+    padding: 6px 12px;
     cursor: pointer;
     font-family: inherit;
   }
 
+  .file-item .file-remove:hover { color: #d70015; border-color: #d70015; }
+
   #btnAddFile {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 12px;
+    background: none;
+    border: 1px solid var(--accent);
+    border-radius: 980px;
+    padding: 6px 16px;
     color: var(--accent);
-    font-size: 0.9rem;
-    margin-top: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
   }
 
-  #btnAddFile:hover {
-    background: #f0f6fc;
+  #btnAddFile:hover { background: rgba(0, 113, 227, 0.08); }
+
+  details.adjust {
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-input);
+    padding: 12px 16px;
   }
 
-  .btn-calc {
+  details.adjust summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--accent);
+  }
+
+  details.adjust .form-grid { margin-top: 16px; }
+
+  .btn-primary {
     display: block;
     width: 100%;
-    margin-top: 20px;
-    padding: 10px 16px;
+    margin-top: 28px;
+    padding: 14px 24px;
     background: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: 6px;
+    border: none;
+    border-radius: 980px;
     color: #fff;
-    font-size: 1rem;
+    font-size: 17px;
     font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .2s ease;
   }
 
-  .btn-calc:hover {
-    background: #0860ca;
-  }
+  .btn-primary:hover { background: var(--accent-hover); }
 
-  .result-grid {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 20px;
-  }
-
-  .result-tile {
-    flex: 1;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
+  .result-hero {
     text-align: center;
-    background: #f6f8fa;
+    padding: 8px 0 20px;
   }
 
-  .result-tile .value {
-    font-size: 1.8rem;
+  .result-credits {
+    font-size: clamp(2.5rem, 6vw, 4rem);
     font-weight: 700;
-    color: var(--accent);
+    letter-spacing: -0.02em;
+    color: var(--text);
   }
 
-  .result-tile .label {
+  .result-credits .unit {
+    font-size: clamp(1rem, 2vw, 1.4rem);
+    font-weight: 500;
     color: var(--muted);
-    font-size: 0.85rem;
-    margin-top: 4px;
+    margin-left: 8px;
   }
+
+  .result-usd {
+    color: var(--muted);
+    font-size: clamp(15px, 2vw, 19px);
+  }
+
+  .assumption {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 20px;
+  }
+
+  .table-scroll { overflow-x: auto; }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
+    font-size: 14px;
   }
 
   th, td {
     text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    border-bottom: 1px solid #e8e8ed;
+    white-space: nowrap;
   }
 
-  th {
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.selected-model td { font-weight: 700; }
+
+  .footnote {
     color: var(--muted);
-    font-weight: 600;
-  }
-
-  tbody tr:hover {
-    background: #f6f8fa;
-  }
-
-  .provider-row td {
-    background: #f6f8fa;
-    font-weight: 600;
-    color: var(--muted);
-    font-size: 0.8rem;
-    text-transform: uppercase;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 8px;
   }
 </style>
 </head>
 <body>
-  <h1>GitHub Copilot クレジット消費量計算ツール</h1>
-  <p class="subtitle">
-    2026/6/1 に premium request 課金は廃止され、GitHub AI Credits（1クレジット = $0.01）の従量課金制に移行しました。
-    Chat / CLI / code review の消費量を事前見積もりし、事務局承認プロセスに活用してください。
-  </p>
-
-  <div class="overhead-note">
-    ℹ️ Chat/CLI では system prompt・tool definitions 等の見えない文脈分として、機能ごとの概算オーバーヘッド（<code>FEATURE_OVERHEAD_TOKENS</code>）を入力トークンに自動加算しています。
-  </div>
-
-  <div class="filesize-note">
-    ℹ️ ファイルサイズ(KB)からのトークン推定は簡易概算です。Word/Excel/PowerPoint/PDF は圧縮・画像・メタデータ等の影響で実際のトークン量と差が出ることがあります。精度を上げたい場合は本文をテキスト欄へ貼り付けてください。
-  </div>
-
-  <div class="card">
-    <label for="featureMode">機能</label>
-    <select id="featureMode">
-      <option value="chat">Copilot Chat</option>
-      <option value="cli">Copilot CLI</option>
-      <option value="codeReview">Copilot code review</option>
-    </select>
-  </div>
-
-  <!-- Chat/CLI 用フォーム -->
-  <div class="card" id="chatCliForm">
-    <h2>入力設定</h2>
-    <label for="modelId">使用モデル</label>
-    <select id="modelId"></select> <!-- provider ごとに <optgroup> でグルーピング -->
-
-    <label for="promptText">プロンプト・指示文</label>
-    <textarea id="promptText"></textarea>
-    <span class="help-text" id="promptTokenHint"></span>
-
-    <label for="contextText">参照コード・設計書（テキスト）</label>
-    <textarea id="contextText"></textarea>
-    <span class="help-text" id="contextTokenHint"></span>
-
-    <label>添付ファイル</label>
-    <div id="fileList"></div>
-    <button type="button" id="btnAddFile">＋ ファイルを追加</button>
-
-    <label for="historyTurns">今回のリクエストに含める過去会話ターン数</label>
-    <input type="number" id="historyTurns" value="0" min="0" max="100">
-    <span class="help-text">参照する過去会話ターン数。多いほど履歴分のトークンが今回のリクエストに加算されます。</span>
-
-    <label for="outputChars">想定回答文字数</label>
-    <input type="number" id="outputChars" value="1500" min="1">
-
-    <label for="cacheScenario">参照情報の再利用状況</label>
-    <select id="cacheScenario">
-      <option value="initial">初回依頼（0%）</option>
-      <option value="noReference">参照情報なし（0%）</option>
-      <option value="secondUse">同じ資料を使う2回目（25%）</option>
-      <option value="twoToThreeTurns">同じ資料で2〜3往復（35%）</option>
-      <option value="fourPlusTurns">同じ資料で4往復以上（50%）</option>
-    </select>
-    <p class="help-text">
-      参照コード・設計書・添付ファイルなど、同じ参照情報を同一セッション内でどの程度再利用するかの想定です。
-      初回依頼や単発利用では0%、同じ資料を継続して使う場合は25〜50%を目安にします。
-      CLIで同一セッションを継続する場合のみ、追加で10%を加算します。
+<div class="container">
+  <header class="hero">
+    <h1>Copilot クレジット計算</h1>
+    <p class="subtitle">
+      GitHub Copilot の1リクエストあたりのクレジット消費量を、モードとタスク規模から事前見積もり。
+      1クレジット = $0.01。
     </p>
+  </header>
 
-    <div id="cliCacheBonusRow" style="display:none">
-      <label>
-        <input type="checkbox" id="cliSameSession">
-        CLIで同一セッションを継続して利用する（+10%）
-      </label>
-      <p class="help-text">
-        Copilot CLIで同一セッション内に同じ参照情報を使い続ける場合のみ選択してください。
-      </p>
+  <div class="segment-wrap">
+    <div class="segmented" id="modeSegment">
+      <input type="radio" name="mode" id="modeAsk" value="ask" checked>
+      <label for="modeAsk">Ask</label>
+      <input type="radio" name="mode" id="modePlan" value="plan">
+      <label for="modePlan">Plan</label>
+      <input type="radio" name="mode" id="modeAgent" value="agent">
+      <label for="modeAgent">Agent</label>
     </div>
-
-    <button type="button" class="btn-calc" id="btnCalcChat">クレジット消費量を計算する</button>
   </div>
+  <p class="mode-description" id="modeDescription"></p>
 
-  <!-- code review 用フォーム -->
-  <div class="card" id="codeReviewForm" style="display:none">
-    <h2>Copilot code review</h2>
-    <p class="help-text">モデルは GitHub 側で自動選択されるため選択欄はありません。</p>
-    <div class="notice" id="codeReviewNotice">
-      Copilot code review の消費量は、変更行数 × 暫定係数で概算しています。
-      実際の消費量とは差が出る可能性があります。
-    </div>
-    <label for="diffLines">変更行数（diff行数）</label>
-    <input type="number" id="diffLines" value="200" min="1">
-    <button type="button" class="btn-calc" id="btnCalcCodeReview">クレジット消費量を計算する</button>
-  </div>
-
-  <!-- 結果エリア -->
-  <div id="results" style="display:none">
-    <div class="card">
-      <h2>計算結果</h2>
-      <div class="result-grid">
-        <div class="result-tile"><div class="value" id="resCredits">-</div><div class="label">消費クレジット</div></div>
-        <div class="result-tile"><div class="value" id="resUSD">-</div><div class="label">概算金額 (USD)</div></div>
+  <section class="card">
+    <h2>入力</h2>
+    <div class="form-grid">
+      <div class="field span-full">
+        <label class="field-label" for="modelId">使用モデル</label>
+        <select id="modelId"></select>
       </div>
-      <p class="help-text" id="cacheInfoText"></p>
-      <table><thead><tr><th>内訳</th><th>クレジット</th></tr></thead><tbody id="breakdownBody"></tbody></table>
+
+      <div class="field span-full">
+        <label class="field-label" for="promptText">プロンプト・指示文</label>
+        <textarea id="promptText" placeholder="実際に送るプロンプトを貼り付けると精度が上がります"></textarea>
+        <span class="help-text" id="promptTokenHint"></span>
+      </div>
+
+      <div class="field span-full">
+        <label class="field-label" for="contextText">参照コード・設計書（テキスト貼り付け）</label>
+        <textarea id="contextText"></textarea>
+        <span class="help-text" id="contextTokenHint"></span>
+      </div>
+
+      <div class="field span-full">
+        <label class="field-label">参照ファイル・フォルダ</label>
+        <div id="fileList"></div>
+        <button type="button" id="btnAddFile">＋ 追加</button>
+        <span class="help-text">
+          ファイルサイズ(KB)からの推定は簡易概算です。Word/Excel/PowerPoint/PDF は実際のトークン量と差が出ることがあります。
+          精度を上げたい場合は本文をテキスト欄へ貼り付けてください。
+        </span>
+      </div>
+
+      <div class="field" id="askTurnField">
+        <label class="field-label" for="turnNumber">何回目のやり取りか</label>
+        <input type="number" id="turnNumber" value="1" min="1" max="100">
+        <span class="help-text">2回目以降は履歴分の入力加算とキャッシュ割引を自動適用します。</span>
+      </div>
+
+      <div class="field" id="askOutputField">
+        <label class="field-label" for="outputChars">想定回答文字数</label>
+        <input type="number" id="outputChars" value="1500" min="1">
+      </div>
+
+      <div class="field span-full" id="scaleField" hidden>
+        <label class="field-label">タスク規模</label>
+        <div class="segmented" id="scaleSegment">
+          <input type="radio" name="taskScale" id="scaleSmall" value="small">
+          <label for="scaleSmall">軽微</label>
+          <input type="radio" name="taskScale" id="scaleMedium" value="medium" checked>
+          <label for="scaleMedium">中規模</label>
+          <input type="radio" name="taskScale" id="scaleLarge" value="large">
+          <label for="scaleLarge">大規模</label>
+        </div>
+        <span class="help-text">軽微＝数ファイルの小修正 / 中規模＝一機能の実装 / 大規模＝横断的な変更・大きな新機能</span>
+      </div>
+
+      <div class="field span-full" id="adjustField" hidden>
+        <details class="adjust">
+          <summary>詳細調整（反復回数・サブエージェント数など）</summary>
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label" for="adjIterations">反復回数（モデル呼び出し数）</label>
+              <input type="number" id="adjIterations" min="1">
+            </div>
+            <div class="field">
+              <label class="field-label" for="adjGrowth">1反復あたりの増分トークン</label>
+              <input type="number" id="adjGrowth" min="0">
+            </div>
+            <div class="field">
+              <label class="field-label" for="adjOutputPerIter">1反復あたりの出力トークン</label>
+              <input type="number" id="adjOutputPerIter" min="0">
+            </div>
+            <div class="field">
+              <label class="field-label" for="adjFinalOutput">最終成果物の出力トークン</label>
+              <input type="number" id="adjFinalOutput" min="0">
+            </div>
+            <div class="field">
+              <label class="field-label" for="adjSubagents">サブエージェント数</label>
+              <input type="number" id="adjSubagents" min="0">
+            </div>
+          </div>
+          <p class="help-text">タスク規模を切り替えると値はプリセットに戻ります。係数は実測前の暫定値です。</p>
+        </details>
+      </div>
     </div>
 
-    <div class="card" id="comparisonCard">
-      <h2>モデル別比較（登録済みモデルすべて、provider ごとにグルーピング表示）</h2>
-      <table><thead><tr><th>モデル</th><th>提供元</th><th>クレジット</th><th>USD</th></tr></thead><tbody id="comparisonBody"></tbody></table>
-    </div>
+    <button type="button" class="btn-primary" id="btnCalc">クレジット消費量を計算</button>
+  </section>
+
+  <div id="results" hidden>
+    <section class="card">
+      <h2>計算結果</h2>
+      <div class="result-hero">
+        <div class="result-credits"><span id="resCredits">-</span><span class="unit">credits</span></div>
+        <div class="result-usd" id="resUSD">-</div>
+      </div>
+      <p class="assumption" id="assumptionText"></p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>内訳</th><th>クレジット</th></tr></thead>
+          <tbody id="breakdownBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" id="comparisonCard">
+      <h2>モデル別比較</h2>
+      <p class="help-text">同じ条件で登録済みモデルすべてを比較しています（コスト昇順）。</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>モデル</th><th>提供元</th><th>クレジット</th><th>USD</th></tr></thead>
+          <tbody id="comparisonBody"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
-  <script>
+  <p class="footnote">
+    表示される値は暫定係数に基づく概算です。実際の消費量と差が出ることがあります。
+  </p>
+</div>
+<script>
 // クレジット単価 (USD per 1,000,000 tokens)
 // GitHub Copilot は 2026/6/1 に premium request 課金を廃止し、
 // トークンベースの従量課金（GitHub AI Credits, 1 credit = $0.01）へ移行した。
@@ -365,19 +441,54 @@
 // 出典: 事務局提供の単価表（2026-07-01 時点）
 const USD_PER_CREDIT = 0.01;
 
-// Chat/CLI利用時、ユーザー入力とは別に system prompt / tool definitions /
+// モード利用時、ユーザー入力とは別に system prompt / tool definitions /
 // custom instructions 等の見えない文脈が消費するトークンの概算固定値。
-// TODO: 実測データが無いため暫定値。Phase 1 で実測較正すること。
+// Plan/Agent はツール定義が多いため大きい。要確認（暫定値）。実測データ取得後に較正すること。
 const FEATURE_OVERHEAD_TOKENS = {
-  chat: 1500,
-  cli: 2500,
+  ask: 1500,
+  plan: 4000,
+  agent: 6000,
 };
 
-// Copilot code review はモデルをユーザーが選択できないため、
-// PR 変更行数（diff行数）に経験係数を掛けた概算とする。
-// 変数名に EXPERIMENTAL を含め、他のモデル別単価と同列の確からしさに見えないようにする。
-// 要確認: 実測データが無いため暫定値。Phase 1 で実測較正すること。
-const EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE = 0.05; // 要確認（暫定値）
+// Plan/Agent モードの反復シミュレーション用プリセット。
+// iterations: モデル呼び出し回数 / growthPerIterationTokens: 1反復あたりの
+// コンテキスト増分（ツール実行結果＋前回出力）/ outputPerIterationTokens: 1反復
+// あたりの出力 / finalOutputTokens: 最終成果物（Plan=計画書, Agent=コード＋説明）/
+// subagents: サブエージェント数。
+// 変数名に EXPERIMENTAL を含め、モデル単価と同列の確からしさに見せない。
+// 要確認（暫定値）: 実測データが無い。実測後に較正すること。
+const EXPERIMENTAL_AGENTIC_PRESETS = {
+  plan: {
+    small:  { iterations: 4,  growthPerIterationTokens: 3000, outputPerIterationTokens: 300,  finalOutputTokens: 2000, subagents: 0 },
+    medium: { iterations: 8,  growthPerIterationTokens: 4000, outputPerIterationTokens: 400,  finalOutputTokens: 4000, subagents: 0 },
+    large:  { iterations: 14, growthPerIterationTokens: 5000, outputPerIterationTokens: 500,  finalOutputTokens: 8000, subagents: 2 },
+  },
+  agent: {
+    small:  { iterations: 6,  growthPerIterationTokens: 3000, outputPerIterationTokens: 800,  finalOutputTokens: 1000, subagents: 0 },
+    medium: { iterations: 15, growthPerIterationTokens: 4000, outputPerIterationTokens: 1000, finalOutputTokens: 1500, subagents: 1 },
+    large:  { iterations: 30, growthPerIterationTokens: 5000, outputPerIterationTokens: 1200, finalOutputTokens: 2000, subagents: 3 },
+  },
+};
+
+// サブエージェント1体分の固定小型ループ。baseContextTokens はタスク説明ぶんで、
+// これにメイン参照トークン × referenceShareRatio を加えたものが C0 になる。
+// 要確認（暫定値）。
+const EXPERIMENTAL_SUBAGENT_DEFAULTS = {
+  iterations: 6,
+  baseContextTokens: 3000,
+  referenceShareRatio: 0.5,
+  growthPerIterationTokens: 3000,
+  outputPerIterationTokens: 800,
+};
+
+// Ask モードの「何回目のやり取りか(T)」→ キャッシュヒット率。
+// minTurn 降順に評価し、最初に T >= minTurn を満たした ratio を使う（該当なし＝T=1 は 0）。
+// 要確認（暫定値）。
+const ASK_TURN_CACHE_RATIOS = [
+  { minTurn: 5, ratio: 0.50 },
+  { minTurn: 3, ratio: 0.35 },
+  { minTurn: 2, ratio: 0.25 },
+];
 
 const CLAUDE_SONNET_4_RATE = { input: 3.00, cachedInput: 0.30, cacheWrite: 3.75, output: 15.00 };
 const CLAUDE_OPUS_4_RATE   = { input: 5.00, cachedInput: 0.50, cacheWrite: 6.25, output: 25.00 };
@@ -491,6 +602,7 @@ function estimateTextTokens(text) {
 // Word/Excel/PPT は XML ラッパーのオーバーヘッドがあるため実コンテンツより少ない
 const FILE_TOKENS_PER_KB = {
   md:   { ja: 650, en: 250 },
+  code: { ja: 300, en: 300 }, // ソースコード/フォルダ。ASCII主体のため言語共通。要確認（暫定値）
   pdf:  { ja: 400, en: 180 },
   docx: { ja: 300, en: 130 },
   pptx: { ja: 250, en: 110 },
@@ -513,6 +625,7 @@ function estimateHistoryTokens(previousTurns, avgUserChars, avgAssistantChars) {
 
   return Math.ceil(previousTurns * (userTokens + assistantTokens));
 }
+
 
 
 
@@ -545,7 +658,8 @@ function calculateCredits(tokens, modelKey) {
 
   const inputCredits       = toCredits(inputTokens, rate.input);
   const cachedInputCredits = toCredits(cachedInputTokens, rate.cachedInput);
-  const cacheWriteCredits  = toCredits(cacheWriteTokens, rate.cacheWrite);
+  // cacheWrite 単価が無いモデル（OpenAI/Google等）はキャッシュ書き込みを通常 input 単価で課金する
+  const cacheWriteCredits  = toCredits(cacheWriteTokens, rate.cacheWrite ?? rate.input);
   const outputCredits      = toCredits(outputTokens, rate.output);
   const totalCredits = inputCredits + cachedInputCredits + cacheWriteCredits + outputCredits;
 
@@ -572,74 +686,135 @@ function compareModels(tokens) {
     .sort((a, b) => a.totalCredits - b.totalCredits);
 }
 
-function calculateCodeReviewCredits(diffLines) {
-  const totalCredits = diffLines * EXPERIMENTAL_CODE_REVIEW_CREDITS_PER_DIFF_LINE;
-  return {
-    diffLines,
-    totalCredits: round4(totalCredits),
-    totalUSD: round4(creditsToUSD(totalCredits)),
-  };
-}
-
 function creditsToUSD(credits) {
   return credits * USD_PER_CREDIT;
 }
 
-// Chat/CLI 用の tokens オブジェクトを組み立てる。
-// system prompt / tool definitions / custom instructions 等の見えないオーバーヘッドを
-// FEATURE_OVERHEAD_TOKENS で加算し、cacheHitRatio に応じて reference tokens を
-// cachedInputTokens と freshReferenceTokens に振り分ける。
-function buildChatCliTokens({
-  promptTokens = 0,
-  referenceTokens = 0,
-  historyTokens = 0,
-  outputTokens = 0,
-  cacheHitRatio = 0,
-  feature = 'chat',
-}) {
-  const normalizedCacheHitRatio = Math.min(Math.max(cacheHitRatio, 0), 1);
-  const overheadTokens = FEATURE_OVERHEAD_TOKENS[feature] ?? 0;
-
-  const cachedInputTokens = Math.ceil(referenceTokens * normalizedCacheHitRatio);
-  const freshReferenceTokens = Math.ceil(referenceTokens * (1 - normalizedCacheHitRatio));
+// エージェントループ（Plan/Agent）のトークンを反復シミュレーションの閉形式で見積もる。
+// 1回目: ベースコンテキスト C0 をキャッシュ書き込み。
+// i回目(i>=2): 蓄積済み C0+(i-2)·G をキャッシュ読み込み、新規増分 G をキャッシュ書き込み。
+// 出力は毎反復 O、最終回に F を追加。
+function estimateAgenticTokens({
+  baseContextTokens = 0,
+  iterations = 1,
+  growthPerIterationTokens = 0,
+  outputPerIterationTokens = 0,
+  finalOutputTokens = 0,
+} = {}) {
+  const clamp0 = (n) => (Number.isFinite(n) && n > 0 ? n : 0);
+  const N = Math.max(1, Math.floor(Number.isFinite(iterations) ? iterations : 1));
+  const c0 = clamp0(baseContextTokens);
+  const g = clamp0(growthPerIterationTokens);
+  const o = clamp0(outputPerIterationTokens);
+  const f = clamp0(finalOutputTokens);
 
   return {
-    inputTokens: Math.ceil(promptTokens + freshReferenceTokens + historyTokens + overheadTokens),
-    cachedInputTokens,
-    cacheWriteTokens: 0,
-    outputTokens: Math.ceil(outputTokens),
+    inputTokens: 0,
+    cachedInputTokens: Math.ceil((N - 1) * c0 + (g * (N - 1) * (N - 2)) / 2),
+    cacheWriteTokens: Math.ceil(c0 + (N - 1) * g),
+    outputTokens: Math.ceil(N * o + f),
   };
-}
-
-const CACHE_SCENARIO_BASE_RATIOS = {
-  initial: 0,
-  noReference: 0,
-  secondUse: 0.25,
-  twoToThreeTurns: 0.35,
-  fourPlusTurns: 0.50,
-};
-
-const CLI_SAME_SESSION_BONUS = 0.10;
-const MAX_CACHE_HIT_RATIO = 0.60;
-
-// 参照情報の再利用状況（cacheScenario）から Cached Input 比率を推定する。
-// 利用者が%を直接入力するUIは持たず、この推定値のみを使う。
-function estimateCacheHitRatio({
-  cacheScenario = 'initial',
-  feature = 'chat',
-  referenceTokens = 0,
-  cliSameSession = false,
-} = {}) {
-  if (referenceTokens <= 0) return 0;
-
-  const baseRatio = CACHE_SCENARIO_BASE_RATIOS[cacheScenario] ?? 0;
-  const cliBonus = feature === 'cli' && cliSameSession ? CLI_SAME_SESSION_BONUS : 0;
-
-  return Math.min(baseRatio + cliBonus, MAX_CACHE_HIT_RATIO);
 }
 
 function round4(n) {
   return Math.round(n * 10000) / 10000;
+}
+
+function addTokens(a, b) {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    cachedInputTokens: a.cachedInputTokens + b.cachedInputTokens,
+    cacheWriteTokens: a.cacheWriteTokens + b.cacheWriteTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+  };
+}
+
+// 「何回目のやり取りか」からキャッシュヒット率を推定する。
+function askCacheRatioForTurn(turnNumber) {
+  const entry = ASK_TURN_CACHE_RATIOS.find((e) => turnNumber >= e.minTurn);
+  return entry ? entry.ratio : 0;
+}
+
+// Ask モード（1回のモデル呼び出し）の tokens を組み立てる。
+// turnNumber(T) が履歴トークンとキャッシュ率の両方を駆動する:
+//  - 履歴: (T-1)ターン × 平均ターンサイズ（ユーザー500文字＋アシスタント1,000文字）
+//  - キャッシュ率: askCacheRatioForTurn(T) を参照情報＋履歴に適用
+const ASK_AVG_USER_CHARS = 500;
+const ASK_AVG_ASSISTANT_CHARS = 1000;
+
+function buildAskTokens({
+  promptTokens = 0,
+  referenceTokens = 0,
+  turnNumber = 1,
+  outputTokens = 0,
+} = {}) {
+  const T = Math.max(1, Math.floor(Number.isFinite(turnNumber) ? turnNumber : 1));
+  const overheadTokens = FEATURE_OVERHEAD_TOKENS.ask;
+  const historyTokens = estimateHistoryTokens(T - 1, ASK_AVG_USER_CHARS, ASK_AVG_ASSISTANT_CHARS);
+  const cacheRatio = askCacheRatioForTurn(T);
+
+  const cacheableTokens = referenceTokens + historyTokens;
+  const cachedInputTokens = Math.ceil(cacheableTokens * cacheRatio);
+  const freshTokens = cacheableTokens - cachedInputTokens;
+
+  return {
+    tokens: {
+      inputTokens: Math.ceil(overheadTokens + promptTokens + freshTokens),
+      cachedInputTokens,
+      cacheWriteTokens: 0,
+      outputTokens: Math.ceil(outputTokens),
+    },
+    assumptions: { turnNumber: T, cacheRatio, historyTokens },
+  };
+}
+
+// Plan/Agent モードの tokens を組み立てる。プリセット（taskScale）を既定値とし、
+// 個別パラメータの引数指定があればそちらを優先する。サブエージェントは
+// EXPERIMENTAL_SUBAGENT_DEFAULTS の固定小型ループ × subagents 体を合算する。
+function buildAgenticTokens({
+  mode,
+  taskScale = 'medium',
+  promptTokens = 0,
+  referenceTokens = 0,
+  iterations,
+  growthPerIterationTokens,
+  outputPerIterationTokens,
+  finalOutputTokens,
+  subagents,
+} = {}) {
+  const preset = EXPERIMENTAL_AGENTIC_PRESETS[mode]?.[taskScale];
+  if (!preset) throw new Error(`Unknown mode/taskScale: ${mode}/${taskScale}`);
+
+  const params = {
+    iterations: iterations ?? preset.iterations,
+    growthPerIterationTokens: growthPerIterationTokens ?? preset.growthPerIterationTokens,
+    outputPerIterationTokens: outputPerIterationTokens ?? preset.outputPerIterationTokens,
+    finalOutputTokens: finalOutputTokens ?? preset.finalOutputTokens,
+    subagents: Math.max(0, Math.floor(subagents ?? preset.subagents)),
+  };
+
+  const overheadTokens = FEATURE_OVERHEAD_TOKENS[mode] ?? 0;
+  let tokens = estimateAgenticTokens({
+    baseContextTokens: overheadTokens + promptTokens + referenceTokens,
+    iterations: params.iterations,
+    growthPerIterationTokens: params.growthPerIterationTokens,
+    outputPerIterationTokens: params.outputPerIterationTokens,
+    finalOutputTokens: params.finalOutputTokens,
+  });
+
+  const sub = EXPERIMENTAL_SUBAGENT_DEFAULTS;
+  const subTokens = estimateAgenticTokens({
+    baseContextTokens: sub.baseContextTokens + referenceTokens * sub.referenceShareRatio,
+    iterations: sub.iterations,
+    growthPerIterationTokens: sub.growthPerIterationTokens,
+    outputPerIterationTokens: sub.outputPerIterationTokens,
+    finalOutputTokens: 0,
+  });
+  for (let i = 0; i < params.subagents; i++) {
+    tokens = addTokens(tokens, subTokens);
+  }
+
+  return { tokens, assumptions: { mode, taskScale, ...params } };
 }
 
 
@@ -648,6 +823,7 @@ function round4(n) {
 
 const FILE_TYPE_OPTIONS = [
   { value: 'md', label: 'Markdown / テキスト' },
+  { value: 'code', label: 'ソースコード / フォルダ' },
   { value: 'pdf', label: 'PDF' },
   { value: 'docx', label: 'Word (.docx)' },
   { value: 'pptx', label: 'PowerPoint (.pptx)' },
@@ -656,18 +832,18 @@ const FILE_TYPE_OPTIONS = [
 
 const BREAKDOWN_LABELS = {
   inputCredits: '入力',
-  cachedInputCredits: 'キャッシュ入力',
+  cachedInputCredits: 'キャッシュ読み込み',
   cacheWriteCredits: 'キャッシュ書き込み',
   outputCredits: '出力',
 };
 
-const CACHE_SCENARIO_LABELS = {
-  initial: '初回依頼',
-  noReference: '参照情報なし',
-  secondUse: '同じ資料を使う2回目',
-  twoToThreeTurns: '同じ資料で2〜3往復',
-  fourPlusTurns: '同じ資料で4往復以上',
+const MODE_DESCRIPTIONS = {
+  ask: 'Ask は1回のモデル呼び出しで回答を得るモードです。会話が進むほど履歴分の入力が増え、同じ参照情報にはキャッシュ割引が効きます。',
+  plan: 'Plan はコードベースを探索して実装計画書を作るモードです。内部でモデル呼び出しが複数回起こる前提で概算します。',
+  agent: 'Agent は自律的にコードを編集・実行するモードです。反復回数とサブエージェント数に応じて消費が大きく変わります。',
 };
+
+const SCALE_LABELS = { small: '軽微', medium: '中規模', large: '大規模' };
 
 function formatCredits(credits) {
   return credits.toLocaleString('ja-JP', { maximumFractionDigits: 4 });
@@ -675,6 +851,19 @@ function formatCredits(credits) {
 
 function formatUSD(usd) {
   return `${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+}
+
+function intValue(id, fallback) {
+  const n = parseInt(document.getElementById(id).value, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function currentMode() {
+  return document.querySelector('input[name="mode"]:checked').value;
+}
+
+function currentScale() {
+  return document.querySelector('input[name="taskScale"]:checked').value;
 }
 
 // モデルセレクトを provider ごとに <optgroup> でグルーピングして生成
@@ -701,33 +890,7 @@ function populateModelSelect() {
   });
 }
 
-// featureMode の切り替えで chatCliForm / codeReviewForm の表示を切り替え、
-// codeReview 選択時は comparisonCard を非表示にする。
-// フォームを切り替えたら #results も一旦隠し、再計算を促す。
-function bindFeatureModeToggle() {
-  const featureModeSelect = document.getElementById('featureMode');
-  const chatCliForm = document.getElementById('chatCliForm');
-  const codeReviewForm = document.getElementById('codeReviewForm');
-  const results = document.getElementById('results');
-  const comparisonCard = document.getElementById('comparisonCard');
-  const cliCacheBonusRow = document.getElementById('cliCacheBonusRow');
-
-  const applyMode = () => {
-    const mode = featureModeSelect.value;
-    const isCodeReview = mode === 'codeReview';
-    chatCliForm.style.display = isCodeReview ? 'none' : '';
-    codeReviewForm.style.display = isCodeReview ? '' : 'none';
-    comparisonCard.style.display = isCodeReview ? 'none' : '';
-    cliCacheBonusRow.style.display = mode === 'cli' ? '' : 'none';
-    results.style.display = 'none';
-  };
-
-  featureModeSelect.addEventListener('change', applyMode);
-  applyMode();
-}
-
-// 添付ファイル行を1件 #fileList に追加する。
-// 行には「ファイル種別セレクト」「サイズ(KB)入力」「削除ボタン」を持たせる。
+// 参照ファイル行を1件 #fileList に追加する
 function addFileRow() {
   const fileList = document.getElementById('fileList');
 
@@ -764,74 +927,144 @@ function addFileRow() {
   fileList.appendChild(row);
 }
 
-// プロンプト・参照テキスト・添付ファイル・過去会話ターン数からトークンを集計し、
-// cacheScenario/cliSameSession から estimateCacheHitRatio でキャッシュ率を自動算出したうえで
-// buildChatCliTokens に渡して tokens オブジェクトを組み立てる。
-// 戻り値には結果表示用のキャッシュ内訳情報 (cacheInfo) も含む。
-function collectChatCliTokens(feature) {
-  const promptTokens = estimateTextTokens(document.getElementById('promptText').value);
-  const contextTokens = estimateTextTokens(document.getElementById('contextText').value);
+// Plan/Agent の詳細調整欄へ現在のタスク規模のプリセット値を反映する。
+// タスク規模を切り替えるとユーザーの編集値はプリセットに戻る仕様。
+function applyPresetToAdjustments() {
+  const mode = currentMode();
+  if (mode === 'ask') return;
+  const preset = EXPERIMENTAL_AGENTIC_PRESETS[mode][currentScale()];
+  document.getElementById('adjIterations').value = preset.iterations;
+  document.getElementById('adjGrowth').value = preset.growthPerIterationTokens;
+  document.getElementById('adjOutputPerIter').value = preset.outputPerIterationTokens;
+  document.getElementById('adjFinalOutput').value = preset.finalOutputTokens;
+  document.getElementById('adjSubagents').value = preset.subagents;
+}
 
-  let fileTokens = 0;
+// モード切替: Ask 専用欄 / Plan・Agent 専用欄の表示を切り替え、結果を隠す
+function applyMode() {
+  const mode = currentMode();
+  const isAsk = mode === 'ask';
+  document.getElementById('askTurnField').hidden = !isAsk;
+  document.getElementById('askOutputField').hidden = !isAsk;
+  document.getElementById('scaleField').hidden = isAsk;
+  document.getElementById('adjustField').hidden = isAsk;
+  document.getElementById('modeDescription').textContent = MODE_DESCRIPTIONS[mode];
+  document.getElementById('results').hidden = true;
+  applyPresetToAdjustments();
+}
+
+// 参照テキスト＋参照ファイル行のトークンを合算する
+function collectReferenceTokens() {
+  let tokens = estimateTextTokens(document.getElementById('contextText').value);
   document.querySelectorAll('.file-item').forEach((row) => {
     const fileType = row.querySelector('.file-type').value;
     const fileSizeKB = parseFloat(row.querySelector('.file-kb-input').value) || 0;
-    fileTokens += estimateFileTokens(fileSizeKB, fileType, 'ja');
+    tokens += estimateFileTokens(fileSizeKB, fileType, 'ja');
   });
-
-  const historyTurns = parseInt(document.getElementById('historyTurns').value, 10) || 0;
-  const historyTokens = estimateHistoryTokens(historyTurns, /* avgUserChars */ 500, /* avgAssistantChars */ 1000);
-
-  const outputChars = parseInt(document.getElementById('outputChars').value, 10) || 0;
-  const outputTokens = estimateTextTokens('a'.repeat(outputChars));
-
-  const referenceTokens = contextTokens + fileTokens;
-  const cacheScenario = document.getElementById('cacheScenario').value;
-  const cliSameSession = document.getElementById('cliSameSession').checked;
-
-  const cacheHitRatio = estimateCacheHitRatio({
-    cacheScenario,
-    feature,
-    referenceTokens,
-    cliSameSession,
-  });
-
-  const tokens = buildChatCliTokens({
-    promptTokens,
-    referenceTokens,
-    historyTokens,
-    outputTokens,
-    cacheHitRatio,
-    feature,
-  });
-
-  const cacheInfo = {
-    cacheScenarioLabel: CACHE_SCENARIO_LABELS[cacheScenario] ?? cacheScenario,
-    cacheHitRatio,
-    cachedInputTokens: tokens.cachedInputTokens,
-    freshReferenceTokens: Math.ceil(referenceTokens * (1 - cacheHitRatio)),
-  };
-
-  return { tokens, cacheInfo };
+  return tokens;
 }
 
-function bindCalcChatButton() {
-  document.getElementById('btnCalcChat').addEventListener('click', () => {
-    const feature = document.getElementById('featureMode').value; // 'chat' | 'cli'
-    const { tokens, cacheInfo } = collectChatCliTokens(feature);
+function askAssumptionText(assumptions) {
+  return (
+    `${assumptions.turnNumber}回目のやり取り / ` +
+    `キャッシュ率 ${Math.round(assumptions.cacheRatio * 100)}% / ` +
+    `履歴 ${assumptions.historyTokens.toLocaleString('ja-JP')} tokens`
+  );
+}
+
+function agenticAssumptionText(assumptions) {
+  return (
+    `規模: ${SCALE_LABELS[assumptions.taskScale] ?? assumptions.taskScale} / ` +
+    `反復 ${assumptions.iterations}回 / ` +
+    `サブエージェント ${assumptions.subagents}体 / ` +
+    `増分 ${assumptions.growthPerIterationTokens.toLocaleString('ja-JP')} tokens/反復`
+  );
+}
+
+function bindCalcButton() {
+  document.getElementById('btnCalc').addEventListener('click', () => {
+    const mode = currentMode();
+    const promptTokens = estimateTextTokens(document.getElementById('promptText').value);
+    const referenceTokens = collectReferenceTokens();
+
+    let built;
+    let assumptionText;
+    if (mode === 'ask') {
+      const outputChars = Math.max(0, intValue('outputChars', 0));
+      built = buildAskTokens({
+        promptTokens,
+        referenceTokens,
+        turnNumber: intValue('turnNumber', 1),
+        outputTokens: estimateTextTokens('a'.repeat(outputChars)),
+      });
+      assumptionText = askAssumptionText(built.assumptions);
+    } else {
+      built = buildAgenticTokens({
+        mode,
+        taskScale: currentScale(),
+        promptTokens,
+        referenceTokens,
+        iterations: intValue('adjIterations', undefined),
+        growthPerIterationTokens: intValue('adjGrowth', undefined),
+        outputPerIterationTokens: intValue('adjOutputPerIter', undefined),
+        finalOutputTokens: intValue('adjFinalOutput', undefined),
+        subagents: intValue('adjSubagents', undefined),
+      });
+      assumptionText = agenticAssumptionText(built.assumptions);
+    }
+
     const modelId = document.getElementById('modelId').value;
-    const result = calculateCredits(tokens, modelId);
-    const comparisons = compareModels(tokens);
-    renderChatResult(result, comparisons, cacheInfo);
+    const result = calculateCredits(built.tokens, modelId);
+    const comparisons = compareModels(built.tokens);
+    renderResult(result, comparisons, assumptionText);
   });
 }
 
-function bindCalcCodeReviewButton() {
-  document.getElementById('btnCalcCodeReview').addEventListener('click', () => {
-    const diffLines = parseInt(document.getElementById('diffLines').value, 10) || 0;
-    const result = calculateCodeReviewCredits(diffLines);
-    renderCodeReviewResult(result);
+// #resCredits / #resUSD / #assumptionText / #breakdownBody / #comparisonBody を更新して表示する
+function renderResult(result, comparisons, assumptionText) {
+  document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
+  document.getElementById('resUSD').textContent = `約 ${formatUSD(result.totalUSD)}`;
+  document.getElementById('assumptionText').textContent = assumptionText;
+
+  const breakdownBody = document.getElementById('breakdownBody');
+  breakdownBody.innerHTML = '';
+  Object.entries(result.breakdown)
+    .filter(([, credits]) => credits > 0)
+    .forEach(([key, credits]) => {
+      const tr = document.createElement('tr');
+      const labelTd = document.createElement('td');
+      labelTd.textContent = BREAKDOWN_LABELS[key] ?? key;
+      const creditsTd = document.createElement('td');
+      creditsTd.textContent = formatCredits(credits);
+      tr.appendChild(labelTd);
+      tr.appendChild(creditsTd);
+      breakdownBody.appendChild(tr);
+    });
+
+  const comparisonBody = document.getElementById('comparisonBody');
+  comparisonBody.innerHTML = '';
+  comparisons.forEach((comparison) => {
+    const modelRate = MODEL_RATES[comparison.modelKey] ?? {};
+    const tr = document.createElement('tr');
+    if (comparison.modelKey === result.modelKey) {
+      tr.className = 'selected-model';
+    }
+    const modelTd = document.createElement('td');
+    modelTd.textContent = comparison.label;
+    const providerTd = document.createElement('td');
+    providerTd.textContent = modelRate.provider ?? '-';
+    const creditsTd = document.createElement('td');
+    creditsTd.textContent = formatCredits(comparison.totalCredits);
+    const usdTd = document.createElement('td');
+    usdTd.textContent = formatUSD(comparison.totalUSD);
+    tr.appendChild(modelTd);
+    tr.appendChild(providerTd);
+    tr.appendChild(creditsTd);
+    tr.appendChild(usdTd);
+    comparisonBody.appendChild(tr);
   });
+
+  document.getElementById('results').hidden = false;
 }
 
 // トークン数ヒントをライブ更新する（input イベント）
@@ -855,98 +1088,21 @@ function bindTokenHints() {
   updateContextHint();
 }
 
-function bindFileRowHandlers() {
-  document.getElementById('btnAddFile').addEventListener('click', () => {
-    addFileRow();
+function bindModeAndScale() {
+  document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+    radio.addEventListener('change', applyMode);
   });
-}
-
-// #resCredits, #resUSD, #breakdownBody, #comparisonBody (chat/CLIのみ) を更新し #results を表示する
-function renderChatResult(result, comparisons, cacheInfo) {
-  const resultsEl = document.getElementById('results');
-  const comparisonCard = document.getElementById('comparisonCard');
-
-  document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
-  document.getElementById('resUSD').textContent = formatUSD(result.totalUSD);
-
-  const cacheInfoText = document.getElementById('cacheInfoText');
-  cacheInfoText.textContent =
-    `参照情報の再利用状況: ${cacheInfo.cacheScenarioLabel} / ` +
-    `適用キャッシュ率: ${Math.round(cacheInfo.cacheHitRatio * 100)}% / ` +
-    `通常Input扱い: ${cacheInfo.freshReferenceTokens.toLocaleString('ja-JP')} tokens / ` +
-    `Cached Input扱い: ${cacheInfo.cachedInputTokens.toLocaleString('ja-JP')} tokens`;
-
-  const breakdownBody = document.getElementById('breakdownBody');
-  breakdownBody.innerHTML = '';
-  Object.entries(result.breakdown)
-    .filter(([, credits]) => credits > 0)
-    .forEach(([key, credits]) => {
-      const tr = document.createElement('tr');
-      const labelTd = document.createElement('td');
-      labelTd.textContent = BREAKDOWN_LABELS[key] ?? key;
-      const creditsTd = document.createElement('td');
-      creditsTd.textContent = formatCredits(credits);
-      tr.appendChild(labelTd);
-      tr.appendChild(creditsTd);
-      breakdownBody.appendChild(tr);
-    });
-
-  const comparisonBody = document.getElementById('comparisonBody');
-  comparisonBody.innerHTML = '';
-  comparisons.forEach((comparison) => {
-    const modelRate = MODEL_RATES[comparison.modelKey] ?? {};
-    const tr = document.createElement('tr');
-    if (comparison.modelKey === result.modelKey) {
-      tr.style.fontWeight = '600';
-    }
-    const modelTd = document.createElement('td');
-    modelTd.textContent = comparison.label;
-    const providerTd = document.createElement('td');
-    providerTd.textContent = modelRate.provider ?? '-';
-    const creditsTd = document.createElement('td');
-    creditsTd.textContent = formatCredits(comparison.totalCredits);
-    const usdTd = document.createElement('td');
-    usdTd.textContent = formatUSD(comparison.totalUSD);
-    tr.appendChild(modelTd);
-    tr.appendChild(providerTd);
-    tr.appendChild(creditsTd);
-    tr.appendChild(usdTd);
-    comparisonBody.appendChild(tr);
+  document.querySelectorAll('input[name="taskScale"]').forEach((radio) => {
+    radio.addEventListener('change', applyPresetToAdjustments);
   });
-
-  comparisonCard.style.display = '';
-  resultsEl.style.display = '';
-}
-
-function renderCodeReviewResult(result) {
-  const resultsEl = document.getElementById('results');
-  const comparisonCard = document.getElementById('comparisonCard');
-
-  document.getElementById('resCredits').textContent = formatCredits(result.totalCredits);
-  document.getElementById('resUSD').textContent = formatUSD(result.totalUSD);
-  document.getElementById('cacheInfoText').textContent = '';
-
-  const breakdownBody = document.getElementById('breakdownBody');
-  breakdownBody.innerHTML = '';
-  const tr = document.createElement('tr');
-  const labelTd = document.createElement('td');
-  labelTd.textContent = `code review（${result.diffLines} 行の暫定係数）`;
-  const creditsTd = document.createElement('td');
-  creditsTd.textContent = formatCredits(result.totalCredits);
-  tr.appendChild(labelTd);
-  tr.appendChild(creditsTd);
-  breakdownBody.appendChild(tr);
-
-  comparisonCard.style.display = 'none';
-  resultsEl.style.display = '';
 }
 
 populateModelSelect();
-bindFeatureModeToggle();
-bindCalcChatButton();
-bindCalcCodeReviewButton();
+bindModeAndScale();
+bindCalcButton();
 bindTokenHints();
-bindFileRowHandlers();
+document.getElementById('btnAddFile').addEventListener('click', addFileRow);
+applyMode();
 
 </script>
 </body>

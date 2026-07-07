@@ -36,8 +36,10 @@ const requiredSnippets = [
   'estimateTextTokens',
   'estimateHistoryTokens',
   'calculateCredits',
-  'buildChatCliTokens',
-  'estimateCacheHitRatio',
+  'estimateAgenticTokens',
+  'buildAskTokens',
+  'buildAgenticTokens',
+  'EXPERIMENTAL_AGENTIC_PRESETS',
   'populateModelSelect',
 ];
 
@@ -54,6 +56,22 @@ if (html.includes('cachedInputPct')) {
 
 if (html.includes('src/rates.js の値を確認してください')) {
   throw new Error('Build failed: developer-facing code review warning should not appear in UI');
+}
+
+// 旧機能（Chat/CLI/code review）が誤って復活していないことを検証する
+const forbiddenLegacySnippets = [
+  'buildChatCliTokens',
+  'estimateCacheHitRatio',
+  'calculateCodeReviewCredits',
+  'cacheScenario',
+  'cliSameSession',
+  'diffLines',
+];
+
+for (const snippet of forbiddenLegacySnippets) {
+  if (html.includes(snippet)) {
+    throw new Error(`Build failed: legacy feature "${snippet}" should not remain in the final UI`);
+  }
 }
 
 // Validate that no leftover import/export statements remain in the inlined script
