@@ -4,6 +4,8 @@ import {
   USD_PER_CREDIT,
   FEATURE_OVERHEAD_TOKENS,
   ASK_TURN_CACHE_RATIOS,
+  EXPERIMENTAL_AGENTIC_PRESETS,
+  EXPERIMENTAL_SUBAGENT_DEFAULTS,
 } from './rates.js';
 import { estimateHistoryTokens } from './tokenizer.js';
 
@@ -160,6 +162,15 @@ function round4(n) {
   return Math.round(n * 10000) / 10000;
 }
 
+function addTokens(a, b) {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    cachedInputTokens: a.cachedInputTokens + b.cachedInputTokens,
+    cacheWriteTokens: a.cacheWriteTokens + b.cacheWriteTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+  };
+}
+
 // 「何回目のやり取りか」からキャッシュヒット率を推定する。
 export function askCacheRatioForTurn(turnNumber) {
   const entry = ASK_TURN_CACHE_RATIOS.find((e) => turnNumber >= e.minTurn);
@@ -197,4 +208,53 @@ export function buildAskTokens({
     },
     assumptions: { turnNumber: T, cacheRatio, historyTokens },
   };
+}
+
+// Plan/Agent モードの tokens を組み立てる。プリセット（taskScale）を既定値とし、
+// 個別パラメータの引数指定があればそちらを優先する。サブエージェントは
+// EXPERIMENTAL_SUBAGENT_DEFAULTS の固定小型ループ × subagents 体を合算する。
+export function buildAgenticTokens({
+  mode,
+  taskScale = 'medium',
+  promptTokens = 0,
+  referenceTokens = 0,
+  iterations,
+  growthPerIterationTokens,
+  outputPerIterationTokens,
+  finalOutputTokens,
+  subagents,
+} = {}) {
+  const preset = EXPERIMENTAL_AGENTIC_PRESETS[mode]?.[taskScale];
+  if (!preset) throw new Error(`Unknown mode/taskScale: ${mode}/${taskScale}`);
+
+  const params = {
+    iterations: iterations ?? preset.iterations,
+    growthPerIterationTokens: growthPerIterationTokens ?? preset.growthPerIterationTokens,
+    outputPerIterationTokens: outputPerIterationTokens ?? preset.outputPerIterationTokens,
+    finalOutputTokens: finalOutputTokens ?? preset.finalOutputTokens,
+    subagents: Math.max(0, Math.floor(subagents ?? preset.subagents)),
+  };
+
+  const overheadTokens = FEATURE_OVERHEAD_TOKENS[mode] ?? 0;
+  let tokens = estimateAgenticTokens({
+    baseContextTokens: overheadTokens + promptTokens + referenceTokens,
+    iterations: params.iterations,
+    growthPerIterationTokens: params.growthPerIterationTokens,
+    outputPerIterationTokens: params.outputPerIterationTokens,
+    finalOutputTokens: params.finalOutputTokens,
+  });
+
+  const sub = EXPERIMENTAL_SUBAGENT_DEFAULTS;
+  const subTokens = estimateAgenticTokens({
+    baseContextTokens: sub.baseContextTokens + referenceTokens * sub.referenceShareRatio,
+    iterations: sub.iterations,
+    growthPerIterationTokens: sub.growthPerIterationTokens,
+    outputPerIterationTokens: sub.outputPerIterationTokens,
+    finalOutputTokens: 0,
+  });
+  for (let i = 0; i < params.subagents; i++) {
+    tokens = addTokens(tokens, subTokens);
+  }
+
+  return { tokens, assumptions: { mode, taskScale, ...params } };
 }

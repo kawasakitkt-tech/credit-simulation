@@ -10,6 +10,7 @@ import {
   estimateAgenticTokens,
   buildAskTokens,
   askCacheRatioForTurn,
+  buildAgenticTokens,
 } from '../src/calculator.js';
 
 describe('rates.js', () => {
@@ -329,5 +330,49 @@ describe('buildAskTokens', () => {
     });
     expect(assumptions.turnNumber).toBe(1);
     expect(assumptions.cacheRatio).toBe(0);
+  });
+});
+
+describe('buildAgenticTokens', () => {
+  it('plan/small プリセット: C0 = overhead(4000)+prompt+reference で閉形式どおり', () => {
+    const { tokens, assumptions } = buildAgenticTokens({
+      mode: 'plan', taskScale: 'small', promptTokens: 500, referenceTokens: 5500,
+    });
+    // C0 = 4000+500+5500 = 10000, プリセット: N=4, G=3000, O=300, F=2000, sub=0
+    expect(tokens.cacheWriteTokens).toBe(10000 + 3 * 3000);
+    expect(tokens.cachedInputTokens).toBe(3 * 10000 + 3000 * 3 * 2 / 2);
+    expect(tokens.outputTokens).toBe(4 * 300 + 2000);
+    expect(assumptions.iterations).toBe(4);
+    expect(assumptions.subagents).toBe(0);
+  });
+
+  it('上書き値がプリセットに優先する', () => {
+    const { tokens, assumptions } = buildAgenticTokens({
+      mode: 'plan', taskScale: 'small', promptTokens: 0, referenceTokens: 0,
+      iterations: 1, finalOutputTokens: 0,
+    });
+    // C0 = 4000, N=1 → cacheWrite=4000, cached=0, output = 1*300 + 0
+    expect(assumptions.iterations).toBe(1);
+    expect(tokens.cacheWriteTokens).toBe(4000);
+    expect(tokens.cachedInputTokens).toBe(0);
+    expect(tokens.outputTokens).toBe(300);
+  });
+
+  it('サブエージェント1体分が既定小型ループとして合算される', () => {
+    const base = buildAgenticTokens({
+      mode: 'agent', taskScale: 'medium', promptTokens: 0, referenceTokens: 1000, subagents: 0,
+    }).tokens;
+    const withSub = buildAgenticTokens({
+      mode: 'agent', taskScale: 'medium', promptTokens: 0, referenceTokens: 1000, subagents: 1,
+    }).tokens;
+    // サブ既定: N=6, C0 = 3000 + 1000*0.5 = 3500, G=3000, O=800, F=0
+    expect(withSub.cacheWriteTokens - base.cacheWriteTokens).toBe(3500 + 5 * 3000);              // 18500
+    expect(withSub.cachedInputTokens - base.cachedInputTokens).toBe(5 * 3500 + 3000 * 5 * 4 / 2); // 47500
+    expect(withSub.outputTokens - base.outputTokens).toBe(6 * 800);                               // 4800
+  });
+
+  it('未知の mode/taskScale はエラーをスロー', () => {
+    expect(() => buildAgenticTokens({ mode: 'ask', taskScale: 'small' })).toThrow();
+    expect(() => buildAgenticTokens({ mode: 'plan', taskScale: 'huge' })).toThrow();
   });
 });
