@@ -45,9 +45,16 @@ describe('calculateCredits', () => {
     expect(result.totalCredits).toBeCloseTo(0.65, 4);
   });
 
-  it('cacheWrite: null のモデルに cacheWriteTokens を渡しても0クレジット', () => {
+  it('cacheWrite 単価なしモデルは cacheWriteTokens を input 単価で課金する', () => {
+    // gpt-5-mini: input 0.25 → 5000 * 0.25 / 10000 = 0.125
     const result = calculateCredits({ ...baseTokens, cacheWriteTokens: 5000 }, 'gpt-5-mini');
-    expect(result.breakdown.cacheWriteCredits).toBe(0);
+    expect(result.breakdown.cacheWriteCredits).toBeCloseTo(0.125, 4);
+  });
+
+  it('cacheWrite 単価ありモデルは cacheWrite 単価で課金する', () => {
+    // claude-sonnet-5: cacheWrite 2.50 → 10000 * 2.50 / 10000 = 2.5
+    const result = calculateCredits({ ...baseTokens, cacheWriteTokens: 10000 }, 'claude-sonnet-5');
+    expect(result.breakdown.cacheWriteCredits).toBeCloseTo(2.5, 4);
   });
 
   it('inputTokens が閾値以下なら通常単価（gpt-5-4）', () => {

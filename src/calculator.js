@@ -34,7 +34,8 @@ export function calculateCredits(tokens, modelKey) {
 
   const inputCredits       = toCredits(inputTokens, rate.input);
   const cachedInputCredits = toCredits(cachedInputTokens, rate.cachedInput);
-  const cacheWriteCredits  = toCredits(cacheWriteTokens, rate.cacheWrite);
+  // cacheWrite 単価が無いモデル（OpenAI/Google等）はキャッシュ書き込みを通常 input 単価で課金する
+  const cacheWriteCredits  = toCredits(cacheWriteTokens, rate.cacheWrite ?? rate.input);
   const outputCredits      = toCredits(outputTokens, rate.output);
   const totalCredits = inputCredits + cachedInputCredits + cacheWriteCredits + outputCredits;
 
