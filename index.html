@@ -3,100 +3,140 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GitHub Copilot クレジット消費量計算ツール</title>
+<title>Copilot クレジット計算</title>
 <style>
   :root {
-    --border: #d0d7de;
-    --accent: #0969da;
-    --warning: #cf222e;
-    --bg: #f6f8fa;
-    --card-bg: #ffffff;
-    --text: #1f2328;
-    --muted: #57606a;
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --divider: #d2d2d7;
+    --radius-card: 18px;
+    --radius-input: 12px;
   }
 
   * { box-sizing: border-box; }
 
   body {
-    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    margin: 0;
     background: var(--bg);
     color: var(--text);
-    margin: 0;
-    padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro JP", "Hiragino Sans", "Yu Gothic UI", "Segoe UI", sans-serif;
     line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
   }
 
-  h1 {
-    font-size: 1.5rem;
-    margin-bottom: 4px;
+  .container {
+    max-width: 980px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 4vw, 40px);
+    padding-bottom: 80px;
   }
 
-  .subtitle {
+  .hero {
+    text-align: center;
+    padding: clamp(40px, 8vw, 80px) 0 clamp(16px, 3vw, 32px);
+  }
+
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+
+  .hero .subtitle {
     color: var(--muted);
-    max-width: 860px;
-    margin-bottom: 16px;
+    font-size: clamp(15px, 2vw, 19px);
+    max-width: 640px;
+    margin: 0 auto;
   }
 
-  .overhead-note,
-  .filesize-note {
-    max-width: 860px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 10px;
-    font-size: 0.9rem;
-    background: #f6f8fa;
-    color: var(--muted);
+  .segment-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0 8px;
   }
 
-  .notice {
-    max-width: 860px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 14px;
-    font-size: 0.9rem;
-    background: #f6f8fa;
+  .segmented {
+    display: inline-flex;
+    background: #e8e8ed;
+    border-radius: 980px;
+    padding: 3px;
+  }
+
+  .segmented input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .segmented label {
+    padding: 8px clamp(16px, 3vw, 28px);
+    border-radius: 980px;
+    font-size: 15px;
+    cursor: pointer;
+    color: var(--text);
+    transition: background .2s ease, box-shadow .2s ease;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .segmented input:checked + label {
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+    font-weight: 600;
+  }
+
+  .mode-description {
+    text-align: center;
     color: var(--muted);
+    font-size: 14px;
+    max-width: 620px;
+    margin: 8px auto 32px;
   }
 
   .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 16px;
-    max-width: 860px;
+    background: var(--card);
+    border-radius: var(--radius-card);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, .06);
+    padding: clamp(20px, 4vw, 36px);
+    margin-bottom: 24px;
   }
 
   .card h2 {
-    font-size: 1.1rem;
-    margin-top: 0;
-    margin-bottom: 14px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 8px;
+    font-size: clamp(19px, 2.5vw, 24px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
   }
 
-  label {
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px 24px;
+  }
+
+  .field.span-full { grid-column: 1 / -1; }
+  .field[hidden] { display: none; }
+
+  .field-label {
     display: block;
     font-weight: 600;
-    margin-top: 14px;
-    margin-bottom: 4px;
-    font-size: 0.9rem;
-  }
-
-  label:first-of-type {
-    margin-top: 0;
+    font-size: 14px;
+    margin-bottom: 6px;
   }
 
   select,
   textarea,
   input[type="number"] {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.95rem;
+    padding: 10px 14px;
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-input);
+    font-size: 15px;
     font-family: inherit;
     background: #fff;
     color: var(--text);
@@ -107,256 +147,292 @@
   input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
   }
 
   textarea {
-    min-height: 90px;
+    min-height: 100px;
     resize: vertical;
   }
 
   .help-text {
     display: block;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: 12px;
     margin-top: 4px;
   }
 
-  #fileList {
-    margin-top: 10px;
-  }
+  #fileList { margin-bottom: 8px; }
 
   .file-item {
     display: flex;
     gap: 8px;
     align-items: center;
     margin-bottom: 8px;
+    flex-wrap: wrap;
   }
 
-  .file-item select {
-    flex: 0 0 auto;
-    width: auto;
-  }
-
-  .file-item .file-kb-input {
-    flex: 0 0 100px;
-    width: 100px;
-  }
+  .file-item select { flex: 1 1 180px; width: auto; }
+  .file-item .file-kb-input { flex: 0 0 110px; width: 110px; }
 
   .file-item .file-remove {
     flex: 0 0 auto;
     background: none;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--warning);
-    padding: 6px 10px;
-    cursor: pointer;
-  }
-
-  .file-item .file-remove:hover {
-    background: #fff1f0;
-  }
-
-  button {
+    border: 1px solid var(--divider);
+    border-radius: 980px;
+    color: var(--muted);
+    padding: 6px 12px;
     cursor: pointer;
     font-family: inherit;
   }
 
+  .file-item .file-remove:hover { color: #d70015; border-color: #d70015; }
+
   #btnAddFile {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 12px;
+    background: none;
+    border: 1px solid var(--accent);
+    border-radius: 980px;
+    padding: 6px 16px;
     color: var(--accent);
-    font-size: 0.9rem;
-    margin-top: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
   }
 
-  #btnAddFile:hover {
-    background: #f0f6fc;
+  #btnAddFile:hover { background: rgba(0, 113, 227, 0.08); }
+
+  details.adjust {
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-input);
+    padding: 12px 16px;
   }
 
-  .btn-calc {
+  details.adjust summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--accent);
+  }
+
+  details.adjust .form-grid { margin-top: 16px; }
+
+  .btn-primary {
     display: block;
     width: 100%;
-    margin-top: 20px;
-    padding: 10px 16px;
+    margin-top: 28px;
+    padding: 14px 24px;
     background: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: 6px;
+    border: none;
+    border-radius: 980px;
     color: #fff;
-    font-size: 1rem;
+    font-size: 17px;
     font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .2s ease;
   }
 
-  .btn-calc:hover {
-    background: #0860ca;
-  }
+  .btn-primary:hover { background: var(--accent-hover); }
 
-  .result-grid {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 20px;
-  }
-
-  .result-tile {
-    flex: 1;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
+  .result-hero {
     text-align: center;
-    background: #f6f8fa;
+    padding: 8px 0 20px;
   }
 
-  .result-tile .value {
-    font-size: 1.8rem;
+  .result-credits {
+    font-size: clamp(2.5rem, 6vw, 4rem);
     font-weight: 700;
-    color: var(--accent);
+    letter-spacing: -0.02em;
+    color: var(--text);
   }
 
-  .result-tile .label {
+  .result-credits .unit {
+    font-size: clamp(1rem, 2vw, 1.4rem);
+    font-weight: 500;
     color: var(--muted);
-    font-size: 0.85rem;
-    margin-top: 4px;
+    margin-left: 8px;
   }
+
+  .result-usd {
+    color: var(--muted);
+    font-size: clamp(15px, 2vw, 19px);
+  }
+
+  .assumption {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 20px;
+  }
+
+  .table-scroll { overflow-x: auto; }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
+    font-size: 14px;
   }
 
   th, td {
     text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    border-bottom: 1px solid #e8e8ed;
+    white-space: nowrap;
   }
 
-  th {
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.selected-model td { font-weight: 700; }
+
+  .footnote {
     color: var(--muted);
-    font-weight: 600;
-  }
-
-  tbody tr:hover {
-    background: #f6f8fa;
-  }
-
-  .provider-row td {
-    background: #f6f8fa;
-    font-weight: 600;
-    color: var(--muted);
-    font-size: 0.8rem;
-    text-transform: uppercase;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 8px;
   }
 </style>
 </head>
 <body>
-  <h1>GitHub Copilot クレジット消費量計算ツール</h1>
-  <p class="subtitle">
-    2026/6/1 に premium request 課金は廃止され、GitHub AI Credits（1クレジット = $0.01）の従量課金制に移行しました。
-    Chat / CLI / code review の消費量を事前見積もりし、事務局承認プロセスに活用してください。
-  </p>
-
-  <div class="overhead-note">
-    ℹ️ Chat/CLI では system prompt・tool definitions 等の見えない文脈分として、機能ごとの概算オーバーヘッド（<code>FEATURE_OVERHEAD_TOKENS</code>）を入力トークンに自動加算しています。
-  </div>
-
-  <div class="filesize-note">
-    ℹ️ ファイルサイズ(KB)からのトークン推定は簡易概算です。Word/Excel/PowerPoint/PDF は圧縮・画像・メタデータ等の影響で実際のトークン量と差が出ることがあります。精度を上げたい場合は本文をテキスト欄へ貼り付けてください。
-  </div>
-
-  <div class="card">
-    <label for="featureMode">機能</label>
-    <select id="featureMode">
-      <option value="chat">Copilot Chat</option>
-      <option value="cli">Copilot CLI</option>
-      <option value="codeReview">Copilot code review</option>
-    </select>
-  </div>
-
-  <!-- Chat/CLI 用フォーム -->
-  <div class="card" id="chatCliForm">
-    <h2>入力設定</h2>
-    <label for="modelId">使用モデル</label>
-    <select id="modelId"></select> <!-- provider ごとに <optgroup> でグルーピング -->
-
-    <label for="promptText">プロンプト・指示文</label>
-    <textarea id="promptText"></textarea>
-    <span class="help-text" id="promptTokenHint"></span>
-
-    <label for="contextText">参照コード・設計書（テキスト）</label>
-    <textarea id="contextText"></textarea>
-    <span class="help-text" id="contextTokenHint"></span>
-
-    <label>添付ファイル</label>
-    <div id="fileList"></div>
-    <button type="button" id="btnAddFile">＋ ファイルを追加</button>
-
-    <label for="historyTurns">今回のリクエストに含める過去会話ターン数</label>
-    <input type="number" id="historyTurns" value="0" min="0" max="100">
-    <span class="help-text">参照する過去会話ターン数。多いほど履歴分のトークンが今回のリクエストに加算されます。</span>
-
-    <label for="outputChars">想定回答文字数</label>
-    <input type="number" id="outputChars" value="1500" min="1">
-
-    <label for="cacheScenario">参照情報の再利用状況</label>
-    <select id="cacheScenario">
-      <option value="initial">初回依頼（0%）</option>
-      <option value="noReference">参照情報なし（0%）</option>
-      <option value="secondUse">同じ資料を使う2回目（25%）</option>
-      <option value="twoToThreeTurns">同じ資料で2〜3往復（35%）</option>
-      <option value="fourPlusTurns">同じ資料で4往復以上（50%）</option>
-    </select>
-    <p class="help-text">
-      参照コード・設計書・添付ファイルなど、同じ参照情報を同一セッション内でどの程度再利用するかの想定です。
-      初回依頼や単発利用では0%、同じ資料を継続して使う場合は25〜50%を目安にします。
-      CLIで同一セッションを継続する場合のみ、追加で10%を加算します。
+<div class="container">
+  <header class="hero">
+    <h1>Copilot クレジット計算</h1>
+    <p class="subtitle">
+      GitHub Copilot の1リクエストあたりのクレジット消費量を、モードとタスク規模から事前見積もり。
+      1クレジット = $0.01。
     </p>
+  </header>
 
-    <div id="cliCacheBonusRow" style="display:none">
-      <label>
-        <input type="checkbox" id="cliSameSession">
-        CLIで同一セッションを継続して利用する（+10%）
-      </label>
-      <p class="help-text">
-        Copilot CLIで同一セッション内に同じ参照情報を使い続ける場合のみ選択してください。
-      </p>
+  <div class="segment-wrap">
+    <div class="segmented" id="modeSegment">
+      <input type="radio" name="mode" id="modeAsk" value="ask" checked>
+      <label for="modeAsk">Ask</label>
+      <input type="radio" name="mode" id="modePlan" value="plan">
+      <label for="modePlan">Plan</label>
+      <input type="radio" name="mode" id="modeAgent" value="agent">
+      <label for="modeAgent">Agent</label>
     </div>
-
-    <button type="button" class="btn-calc" id="btnCalcChat">クレジット消費量を計算する</button>
   </div>
+  <p class="mode-description" id="modeDescription"></p>
 
-  <!-- code review 用フォーム -->
-  <div class="card" id="codeReviewForm" style="display:none">
-    <h2>Copilot code review</h2>
-    <p class="help-text">モデルは GitHub 側で自動選択されるため選択欄はありません。</p>
-    <div class="notice" id="codeReviewNotice">
-      Copilot code review の消費量は、変更行数 × 暫定係数で概算しています。
-      実際の消費量とは差が出る可能性があります。
-    </div>
-    <label for="diffLines">変更行数（diff行数）</label>
-    <input type="number" id="diffLines" value="200" min="1">
-    <button type="button" class="btn-calc" id="btnCalcCodeReview">クレジット消費量を計算する</button>
-  </div>
-
-  <!-- 結果エリア -->
-  <div id="results" style="display:none">
-    <div class="card">
-      <h2>計算結果</h2>
-      <div class="result-grid">
-        <div class="result-tile"><div class="value" id="resCredits">-</div><div class="label">消費クレジット</div></div>
-        <div class="result-tile"><div class="value" id="resUSD">-</div><div class="label">概算金額 (USD)</div></div>
+  <section class="card">
+    <h2>入力</h2>
+    <div class="form-grid">
+      <div class="field span-full">
+        <label class="field-label" for="modelId">使用モデル</label>
+        <select id="modelId"></select>
       </div>
-      <p class="help-text" id="cacheInfoText"></p>
-      <table><thead><tr><th>内訳</th><th>クレジット</th></tr></thead><tbody id="breakdownBody"></tbody></table>
+
+      <div class="field span-full">
+        <label class="field-label" for="promptText">プロンプト・指示文</label>
+        <textarea id="promptText" placeholder="実際に送るプロンプトを貼り付けると精度が上がります"></textarea>
+        <span class="help-text" id="promptTokenHint"></span>
+      </div>
+
+      <div class="field span-full">
+        <label class="field-label" for="contextText">参照コード・設計書（テキスト貼り付け）</label>
+        <textarea id="contextText"></textarea>
+        <span class="help-text" id="contextTokenHint"></span>
+      </div>
+
+      <div class="field span-full">
+        <label class="field-label">参照ファイル・フォルダ</label>
+        <div id="fileList"></div>
+        <button type="button" id="btnAddFile">＋ 追加</button>
+        <span class="help-text">
+          ファイルサイズ(KB)からの推定は簡易概算です。Word/Excel/PowerPoint/PDF は実際のトークン量と差が出ることがあります。
+          精度を上げたい場合は本文をテキスト欄へ貼り付けてください。
+        </span>
+      </div>
+
+      <div class="field" id="askTurnField">
+        <label class="field-label" for="turnNumber">何回目のやり取りか</label>
+        <input type="number" id="turnNumber" value="1" min="1" max="100">
+        <span class="help-text">2回目以降は履歴分の入力加算とキャッシュ割引を自動適用します。</span>
+      </div>
+
+      <div class="field" id="askOutputField">
+        <label class="field-label" for="outputChars">想定回答文字数</label>
+        <input type="number" id="outputChars" value="1500" min="1">
+      </div>
+
+      <div class="field span-full" id="scaleField" hidden>
+        <label class="field-label">タスク規模</label>
+        <div class="segmented" id="scaleSegment">
+          <input type="radio" name="taskScale" id="scaleSmall" value="small">
+          <label for="scaleSmall">軽微</label>
+          <input type="radio" name="taskScale" id="scaleMedium" value="medium" checked>
+          <label for="scaleMedium">中規模</label>
+          <input type="radio" name="taskScale" id="scaleLarge" value="large">
+          <label for="scaleLarge">大規模</label>
+        </div>
+        <span class="help-text">軽微＝数ファイルの小修正 / 中規模＝一機能の実装 / 大規模＝横断的な変更・大きな新機能</span>
+      </div>
+
+      <div class="field span-full" id="adjustField" hidden>
+        <details class="adjust">
+          <summary>詳細調整（反復回数・サブエージェント数など）</summary>
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label" for="adjIterations">反復回数（モデル呼び出し数）</label>
+              <input type="number" id="adjIterations" min="1">
+            </div>
+            <div class="field">
+              <label class="field-label" for="adjGrowth">1反復あたりの増分トークン</label>
+              <input type="number" id="adjGrowth" min="0">
+            </div>
+            <div class="field">
+              <label class="field-label" for="adjOutputPerIter">1反復あたりの出力トークン</label>
+              <input type="number" id="adjOutputPerIter" min="0">
+            </div>
+            <div class="field">
+              <label class="field-label" for="adjFinalOutput">最終成果物の出力トークン</label>
+              <input type="number" id="adjFinalOutput" min="0">
+            </div>
+            <div class="field">
+              <label class="field-label" for="adjSubagents">サブエージェント数</label>
+              <input type="number" id="adjSubagents" min="0">
+            </div>
+          </div>
+          <p class="help-text">タスク規模を切り替えると値はプリセットに戻ります。係数は実測前の暫定値です。</p>
+        </details>
+      </div>
     </div>
 
-    <div class="card" id="comparisonCard">
-      <h2>モデル別比較（登録済みモデルすべて、provider ごとにグルーピング表示）</h2>
-      <table><thead><tr><th>モデル</th><th>提供元</th><th>クレジット</th><th>USD</th></tr></thead><tbody id="comparisonBody"></tbody></table>
-    </div>
+    <button type="button" class="btn-primary" id="btnCalc">クレジット消費量を計算</button>
+  </section>
+
+  <div id="results" hidden>
+    <section class="card">
+      <h2>計算結果</h2>
+      <div class="result-hero">
+        <div class="result-credits"><span id="resCredits">-</span><span class="unit">credits</span></div>
+        <div class="result-usd" id="resUSD">-</div>
+      </div>
+      <p class="assumption" id="assumptionText"></p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>内訳</th><th>クレジット</th></tr></thead>
+          <tbody id="breakdownBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" id="comparisonCard">
+      <h2>モデル別比較</h2>
+      <p class="help-text">同じ条件で登録済みモデルすべてを比較しています（コスト昇順）。</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>モデル</th><th>提供元</th><th>クレジット</th><th>USD</th></tr></thead>
+          <tbody id="comparisonBody"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
-  <script type="module" src="src/ui.js"></script>
+  <p class="footnote">
+    表示される値は暫定係数に基づく概算です。実際の消費量と差が出ることがあります。
+  </p>
+</div>
+<script type="module" src="src/ui.js"></script>
 </body>
 </html>
