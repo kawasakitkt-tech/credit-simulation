@@ -46,6 +46,11 @@ describe('estimateFileTokens（参考値）', () => {
     const tokens = estimateFileTokens(50, 'xlsx', 'ja');
     expect(tokens).toBeGreaterThan(0);
   });
+
+  it('ソースコード/フォルダは約300 tokens/KB（コードは言語によらずASCII主体のため ja/en 共通）', () => {
+    expect(estimateFileTokens(10, 'code', 'ja')).toBe(3000);
+    expect(estimateFileTokens(10, 'code', 'en')).toBe(3000);
+  });
 });
 
 describe('estimateHistoryTokens', () => {

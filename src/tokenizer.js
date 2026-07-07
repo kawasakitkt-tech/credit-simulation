@@ -29,6 +29,7 @@ export function estimateTextTokens(text) {
 // Word/Excel/PPT は XML ラッパーのオーバーヘッドがあるため実コンテンツより少ない
 const FILE_TOKENS_PER_KB = {
   md:   { ja: 650, en: 250 },
+  code: { ja: 300, en: 300 }, // ソースコード/フォルダ。ASCII主体のため言語共通。要確認（暫定値）
   pdf:  { ja: 400, en: 180 },
   docx: { ja: 300, en: 130 },
   pptx: { ja: 250, en: 110 },
